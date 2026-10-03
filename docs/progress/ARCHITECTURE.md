@@ -2,7 +2,7 @@
 
 ## Qué construimos
 
-Un sistema simple de **pagarés/obligaciones de pago en cuotas**. Ejemplo demo: Alice (vendedora) le vende un celular a Bob (comprador) en 10 cuotas mensuales de 100 USDC.
+**Finvia**: infraestructura de financiamiento para PYMEs. Una obligación de pago se estructura en cuotas, se registra en Monad y cada cuota se paga en USDC sobre Solana. Ejemplo demo: una PYME (`buyer`, deudora) recibe USD 10.000 de un acreedor/inversor (`seller`) y los devuelve en 10 cuotas mensuales de 1.000 USDC. Ver D14 sobre la nomenclatura `seller`/`buyer` vs acreedor/deudor.
 
 ## Componentes
 
@@ -25,7 +25,7 @@ Un sistema simple de **pagarés/obligaciones de pago en cuotas**. Ejemplo demo: 
 | Carpeta | Contenido |
 |---|---|
 | `contracts/` | Proyecto Foundry. `src/InstallmentRegistry.sol`, tests en `test/`, scripts `script/Deploy.s.sol` y `script/SeedDemo.s.sol`. |
-| `web/` | Next.js 15 (App Router, TS, Tailwind 4) + viem. `src/lib/monad.ts` (chain/cliente), `src/lib/abi.ts` (ABI generado), `src/lib/registry.ts` (lecturas tipadas). |
+| `web/` | Next.js 15 (App Router, TS, Tailwind 4) + viem. `src/lib/monad.ts` (chain/cliente/explorer), `src/lib/abi.ts` (ABI generado), `src/lib/registry.ts` (lecturas tipadas + `findObligationWithInstallments`), `src/lib/format.ts` (USDC/fechas es-AR), `src/components/StatusBadge.tsx`. Páginas: `/` (listado de obligaciones) y `/obligations/[id]` (detalle + tabla de cuotas, solo lectura). |
 | `scripts/` | `export-abi.sh`: compila el contrato y regenera `web/src/lib/abi.ts`. |
 | `docs/progress/` | Documentación de continuidad. |
 

@@ -23,3 +23,6 @@ export const registryAddress = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || unde
   | undefined;
 
 export const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+
+/** URL base del explorer de Monad (undefined en anvil local). */
+export const explorerUrl = chain.blockExplorers?.default.url;

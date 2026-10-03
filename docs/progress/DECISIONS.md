@@ -41,5 +41,11 @@ Local se usa anvil con las cuentas por defecto (`scripts/local-chain-setup.sh`).
 ### D13 — 2026-10-03 — Deployer = owner = verifier en Monad Testnet
 El contrato `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` se desplegó con la wallet `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, que es también `verifier`. Motivo: una sola clave para la demo. Si el verificador pasa a ser otro servicio, usar `setVerifier` (no hace falta re-desplegar).
 
+### D14 — 2026-10-03 — Producto renombrado a Finvia; foco en financiamiento de PYMEs
+Concepto: OBLIGACIÓN → CUOTAS → FINANCIAMIENTO → PAGO → CANCELACIÓN. **No se renombra el contrato ni sus campos** (`seller`, `buyer`): en la UI se presentan como *acreedor/inversor* (`seller`, quien cobra y crea la obligación) y *deudor/PYME* (`buyer`, quien paga las cuotas). Motivo: cambiar nombres on-chain obligaría a re-desplegar y regenerar ABI sin aportar valor a la demo. La obligación demo ahora es "Capital de trabajo PYME", 10 × 1.000 USDC (USD 10.000).
+
+### D15 — 2026-10-03 — `/obligations/[id]` es Server Component; 404 vía `ObligationNotFound`
+`findObligationWithInstallments` (registry.ts) devuelve `null` si el contrato revierte con `ObligationNotFound`; la página llama `notFound()`. Otros errores (RPC caído) propagan. Se evitan literales `1n` porque `tsconfig` apunta a ES2017 (usar `BigInt(1)`).
+
 ## Fuera del MVP (no implementar sin decisión explícita)
 Sistema legal, integración bancaria, KYC, scoring, marketplace, intereses/multas, cobranza, contratos complejos, auth sofisticada (solo wallets), app móvil, programas Solana propios, bridges.

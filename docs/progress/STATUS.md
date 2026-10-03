@@ -1,6 +1,6 @@
 # Status
 
-_Última actualización: 2026-10-03 (Devin)._
+_Última actualización: 2026-10-03 (Claude Code, continuando a Devin)._
 
 ## Terminado y probado
 - Estructura del repo, documentación de continuidad (`docs/progress/`) y README principal.
@@ -15,19 +15,30 @@ _Última actualización: 2026-10-03 (Devin)._
 - Flujo local: anvil + contrato + web leyendo on-chain.
 - Web leyendo el contrato real en Monad Testnet con `NEXT_PUBLIC_CHAIN_ID=10143` y `NEXT_PUBLIC_REGISTRY_ADDRESS` de la tabla.
 
-## Parcialmente implementado
-- `web/src/lib/registry.ts`: `getObligation` y `getInstallments` existen y tipan, pero ninguna página los usa todavía.
+## Etapa 5 (hecha por Claude Code): visualización
+- `/obligations/[id]`: encabezado (descripción, estado, deudor/PYME, acreedor, cuenta Solana, monto total, cuota, progreso, saldo, próximo vencimiento, cuotas vencidas), tabla de cuotas (N°, monto, vencimiento, estado con badge, pagada el, `paymentRef`), nota de dónde interviene Monad (registro) y Solana (pago, aún no implementado). 404 para id inválido o inexistente.
+- Home: renombrada a Finvia, lista hasta 50 obligaciones recientes con link, monto total, progreso y estado.
+- `data-testid`: `installment-row`, `installment-status`, `payment-ref`, `obligation-status`, `progress`, `outstanding`, `obligation-link`.
+- Demo seed cambiada a Finvia: "Capital de trabajo PYME", 10 × 1.000 USDC (D14).
+
+## Probado en esta sesión
+- `forge test`: 10/10 pasan.
+- `npm run lint`, `npx tsc --noEmit`, `npm run build`: pasan.
+- Anvil + `local-chain-setup.sh` + `next start`: `/obligations/1` → 10 filas PENDING, total 10.000 USDC; tras `markInstallmentPaid(1,1,"demo-sig-1")` → 1 PAID con `paymentRef`, progreso 1/10; tras pagar las 10 → obligación COMPLETED, saldo 0; `/obligations/999`, `/abc`, `/0` → 404; home lista 1 link.
+- **No probado:** OVERDUE en la UI (requiere avanzar tiempo en anvil: `cast rpc evm_increaseTime`; sí está cubierto en el test del contrato), Monad Testnet con datos (no hay obligaciones allá), render visual en navegador (solo se verificó HTML por curl).
+
+## Entorno (nota para agentes en contenedores sin acceso a foundry.paradigm.xyz)
+`foundryup` y la descarga de solc suelen estar bloqueados. Workaround usado: `npm i -g @foundry-rs/forge @foundry-rs/anvil @foundry-rs/cast`, y un shim sobre `solc` (npm) pasado con `FOUNDRY_SOLC=<shim> FOUNDRY_OFFLINE=true`. Con acceso normal, `forge test` funciona sin nada de esto. Los submódulos se inicializan con `git submodule update --init --recursive`.
 
 ## Roto
 - Nada conocido.
 
 ## Falta
-- UI de detalle de obligación y cuotas (etapa 5 → `NEXT_TASK.md`).
-- Crear obligación desde la UI con wallet EVM (etapa 6).
+- Crear obligación desde la UI con wallet EVM (etapa 6 → `NEXT_TASK.md`).
 - Pago manual por el vendedor desde la UI (etapa 7).
 - Todo Solana: pago USDC devnet + memo, verificador `/api/payments/confirm` (etapas 8–9).
 - Deploy de `web/` en Vercel (etapa 12).
-- Todavía no hay obligaciones creadas en Monad Testnet (no se sembró la demo para no crear datos con un comprador ficticio).
+- Todavía no hay obligaciones creadas en Monad Testnet (no se sembró la demo para no crear datos con un deudor ficticio).
 
 ## Cómo ejecutar
 
@@ -57,7 +68,7 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 ## Cómo probar
 - Contrato: `cd contracts && forge test -vv`.
 - Web: `cd web && npm run lint && npx tsc --noEmit && npm run build`.
-- Manual: con el flujo local, `http://localhost:3000` debe mostrar "Obligaciones registradas: 1".
+- Manual: con el flujo local, `http://localhost:3000` debe mostrar "Obligaciones registradas: 1" y `/obligations/1` 10 cuotas PENDING de 1.000 USDC.
 - Si cambiás el contrato: `./scripts/export-abi.sh` para regenerar `web/src/lib/abi.ts`.
 
 ## Direcciones desplegadas
@@ -66,10 +77,10 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 | Monad Testnet (10143) | [`0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`](https://testnet.monadexplorer.com/address/0xF7a6e0f226ecDc708Af88679F2A9a557E918C321) | `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` (= owner/deployer) | 2026-10-03, tx [`0xc4db6db4…`](https://testnet.monadexplorer.com/tx/0xc4db6db49374aff5c5c6a92b24aac41043ed19d92f9776749f8534affb4f6efd) |
 
 ## Última tarea realizada
-Deploy de `InstallmentRegistry` en Monad Testnet y verificación de lectura desde la web. Antes: base del MVP (estructura, docs, contrato con tests, scripts, web).
+Etapa 5: página `/obligations/[id]`, listado en home, rebranding a Finvia (UI + seed demo). Antes (Devin): base del MVP y deploy en Monad Testnet.
 
 ## Próxima tarea recomendada
-Página `/obligations/[id]` con la tabla de cuotas (etapa 5). Detalle en `NEXT_TASK.md`.
+Etapa 6: formulario de creación de obligación con wallet EVM. Detalle en `NEXT_TASK.md`.
 
 ## Credenciales
 - La clave del deployer/verifier (wallet MetaMask de Bernardo `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, solo testnet) está guardada como secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`. **Nunca** commitearla ni ponerla en variables `NEXT_PUBLIC_*`. En Claude Code / local, usarla desde una variable de entorno o `.env` (ignorado por git).

@@ -5,8 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RPC="http://127.0.0.1:8545"
 # Cuentas públicas por defecto de anvil (solo para desarrollo local).
-SELLER_PK="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # cuenta 0 = Alice (vendedora y verifier)
-BUYER_ADDRESS="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"                      # cuenta 1 = Bob (comprador)
+SELLER_PK="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # cuenta 0 = acreedor/inversor (seller) y verifier
+BUYER_ADDRESS="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"                      # cuenta 1 = PYME deudora (buyer)
 SELLER_SOLANA_ADDRESS="${SELLER_SOLANA_ADDRESS:-11111111111111111111111111111111}"
 
 cd "$ROOT/contracts"
