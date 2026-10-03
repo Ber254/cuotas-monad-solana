@@ -8,8 +8,7 @@ export const OBLIGATION_STATUS = ["ACTIVE", "COMPLETED"] as const;
 export type InstallmentStatus = (typeof INSTALLMENT_STATUS)[number];
 export type ObligationStatus = (typeof OBLIGATION_STATUS)[number];
 
-/** USDC usa 6 decimales tanto en Solana como en el contrato. */
-export const USDC_DECIMALS = 6;
+export { USDC_DECIMALS } from "./constants";
 
 function requireAddress(): Address {
   if (!registryAddress) throw new Error("NEXT_PUBLIC_REGISTRY_ADDRESS no está configurada");

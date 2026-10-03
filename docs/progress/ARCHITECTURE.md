@@ -25,7 +25,7 @@
 | Carpeta | Contenido |
 |---|---|
 | `contracts/` | Proyecto Foundry. `src/InstallmentRegistry.sol`, tests en `test/`, scripts `script/Deploy.s.sol` y `script/SeedDemo.s.sol`. |
-| `web/` | Next.js 15 (App Router, TS, Tailwind 4) + viem. `src/lib/monad.ts` (chain/cliente/explorer), `src/lib/abi.ts` (ABI generado), `src/lib/registry.ts` (lecturas tipadas + `findObligationWithInstallments`), `src/lib/format.ts` (USDC/fechas es-AR), `src/components/StatusBadge.tsx`. Páginas: `/` (listado de obligaciones) y `/obligations/[id]` (detalle + tabla de cuotas, solo lectura). |
+| `web/` | Next.js 15 (App Router, TS, Tailwind 4) + viem. `src/lib/monad.ts` (chain/cliente/explorer), `src/lib/abi.ts` (ABI generado), `src/lib/registry.ts` (lecturas tipadas + `findObligationWithInstallments`), `src/lib/format.ts` (USDC/fechas es-AR), `src/components/StatusBadge.tsx`. Páginas: `/` (listado), `/obligations/[id]` (detalle + cuotas) y `/obligations/new` (formulario + wallet; `src/lib/obligationForm.ts` validación pura, `src/lib/wallet.ts` conexión/escritura). |
 | `scripts/` | `export-abi.sh`: compila el contrato y regenera `web/src/lib/abi.ts`. |
 | `docs/progress/` | Documentación de continuidad. |
 

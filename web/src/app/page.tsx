@@ -44,7 +44,12 @@ export default async function Home() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Obligaciones</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Obligaciones</h2>
+          <Link href="/obligations/new" className="rounded bg-green-600 px-3 py-1 text-sm font-semibold" data-testid="new-obligation">
+            + Nueva obligación
+          </Link>
+        </div>
         {obligations.length === 0 ? (
           <p className="text-sm text-white/60">Todavía no hay obligaciones.</p>
         ) : (

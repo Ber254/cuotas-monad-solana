@@ -9,8 +9,8 @@ Etapas chicas e independientes. ✅ = terminada **y probada**; 🟡 = parcial; �
 | 3 | Smart contract en Monad (`InstallmentRegistry`) | ✅ | `forge test` pasa (10 tests). Desplegado en Monad Testnet: `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` |
 | 4 | UI base (Next.js + viem leyendo el contrato) | ✅ | Home muestra red, contrato y `obligationCount` leído on-chain (probado con anvil) |
 | 5 | Visualización de cuotas (`/obligations/[id]`) + listado en home | ✅ | Probado con anvil + curl: 10 filas PENDING, pago de cuota 1 → PAID con `paymentRef`, 10 pagadas → COMPLETED, 404 en `/obligations/999`, `/abc`, `/0` |
-| 6 | Flujo de creación de obligación (form + wallet EVM) | ⬜ | Ver `NEXT_TASK.md`. Crear desde la UI con MetaMask y verla en la página de detalle |
-| 7 | Pago manual de cuota (vendedor marca PAID desde la UI) | ⬜ | Botón visible solo al vendedor; cuota pasa a PAID |
+| 6 | Flujo de creación de obligación (form + wallet EVM) | ✅ | `/obligations/new`. Probado con `npm run test:create` (lógica + tx anvil) y E2E Chromium con wallet inyectada → anvil. **MetaMask real no probado** |
+| 7 | Pago manual de cuota (acreedor marca PAID desde la UI) | ⬜ | Ver `NEXT_TASK.md`. Botón visible solo al acreedor; cuota pasa a PAID |
 | 8 | Integración Solana: pagar con USDC devnet + memo (Phantom) | ⬜ | Tx visible en Solana explorer devnet con memo `cuotas:<id>:<n>` |
 | 9 | Confirmación automática: `/api/payments/confirm` verifica tx Solana y llama `markInstallmentPaid` | ⬜ | Cuota pasa a PAID con `paymentRef` = firma Solana |
 | 10 | Demo end-to-end (Alice/Bob, 10 cuotas, todas pagadas → COMPLETED) | ⬜ | Guion de demo en `STATUS.md` |

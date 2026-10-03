@@ -21,7 +21,12 @@ _Última actualización: 2026-10-03 (Claude Code, continuando a Devin)._
 - `data-testid`: `installment-row`, `installment-status`, `payment-ref`, `obligation-status`, `progress`, `outstanding`, `obligation-link`.
 - Demo seed cambiada a Finvia: "Capital de trabajo PYME", 10 × 1.000 USDC (D14).
 
-## Probado en esta sesión
+## Etapa 6 (hecha por Claude Code): crear obligación desde la UI
+- `/obligations/new` (Client Component): botón conectar wallet (cambia/agrega la red si hace falta), formulario (descripción, PYME deudora, cuenta Solana del acreedor, monto total USDC, cuotas, primer vencimiento, intervalo), validación espejo del contrato, vista previa del calendario de cuotas, envío de `createObligation`, espera de receipt y redirección a `/obligations/<id>` (id del evento `ObligationCreated`). Link "+ Nueva obligación" en home.
+- Tests: `cd web && set -a && . ./.env.local && set +a && npm run test:create` (lógica pura + tx real a anvil). E2E UI: `web/scripts/e2e-create-ui.mjs` (instrucciones en el encabezado).
+- **No probado:** MetaMask real (se usó una wallet inyectada que reenvía a anvil, cuenta 0 desbloqueada); creación en Monad Testnet; el rechazo en wallet (código 4001) está implementado pero no ejercitado.
+
+## Probado en esta sesión (etapa 5)
 - `forge test`: 10/10 pasan.
 - `npm run lint`, `npx tsc --noEmit`, `npm run build`: pasan.
 - Anvil + `local-chain-setup.sh` + `next start`: `/obligations/1` → 10 filas PENDING, total 10.000 USDC; tras `markInstallmentPaid(1,1,"demo-sig-1")` → 1 PAID con `paymentRef`, progreso 1/10; tras pagar las 10 → obligación COMPLETED, saldo 0; `/obligations/999`, `/abc`, `/0` → 404; home lista 1 link.
@@ -34,8 +39,7 @@ _Última actualización: 2026-10-03 (Claude Code, continuando a Devin)._
 - Nada conocido.
 
 ## Falta
-- Crear obligación desde la UI con wallet EVM (etapa 6 → `NEXT_TASK.md`).
-- Pago manual por el vendedor desde la UI (etapa 7).
+- Pago manual por el acreedor desde la UI (etapa 7 → `NEXT_TASK.md`).
 - Todo Solana: pago USDC devnet + memo, verificador `/api/payments/confirm` (etapas 8–9).
 - Deploy de `web/` en Vercel (etapa 12).
 - Todavía no hay obligaciones creadas en Monad Testnet (no se sembró la demo para no crear datos con un deudor ficticio).
@@ -77,10 +81,10 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 | Monad Testnet (10143) | [`0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`](https://testnet.monadexplorer.com/address/0xF7a6e0f226ecDc708Af88679F2A9a557E918C321) | `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` (= owner/deployer) | 2026-10-03, tx [`0xc4db6db4…`](https://testnet.monadexplorer.com/tx/0xc4db6db49374aff5c5c6a92b24aac41043ed19d92f9776749f8534affb4f6efd) |
 
 ## Última tarea realizada
-Etapa 5: página `/obligations/[id]`, listado en home, rebranding a Finvia (UI + seed demo). Antes (Devin): base del MVP y deploy en Monad Testnet.
+Etapa 6: formulario `/obligations/new` con wallet EVM. Antes: etapa 5 (detalle/listado, rebranding Finvia). Antes (Devin): base del MVP y deploy en Monad Testnet.
 
 ## Próxima tarea recomendada
-Etapa 6: formulario de creación de obligación con wallet EVM. Detalle en `NEXT_TASK.md`.
+Etapa 7: botón "Marcar como pagada" para el acreedor. Detalle en `NEXT_TASK.md`.
 
 ## Credenciales
 - La clave del deployer/verifier (wallet MetaMask de Bernardo `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, solo testnet) está guardada como secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`. **Nunca** commitearla ni ponerla en variables `NEXT_PUBLIC_*`. En Claude Code / local, usarla desde una variable de entorno o `.env` (ignorado por git).

@@ -47,5 +47,8 @@ Concepto: OBLIGACIÓN → CUOTAS → FINANCIAMIENTO → PAGO → CANCELACIÓN. *
 ### D15 — 2026-10-03 — `/obligations/[id]` es Server Component; 404 vía `ObligationNotFound`
 `findObligationWithInstallments` (registry.ts) devuelve `null` si el contrato revierte con `ObligationNotFound`; la página llama `notFound()`. Otros errores (RPC caído) propagan. Se evitan literales `1n` porque `tsconfig` apunta a ES2017 (usar `BigInt(1)`).
 
+### D16 — 2026-10-03 — Creación de obligación: validación en cliente espejo del contrato, sin wagmi
+`src/lib/obligationForm.ts` (pura, testeable) replica las reglas de `InvalidParams`; `src/lib/wallet.ts` usa viem + `window.ethereum` (confirma D11, no se agregó wagmi). El monto total debe dividirse exacto entre las cuotas (cuota = total / N en unidades mínimas). Primer vencimiento se guarda a mediodía UTC para que la fecha no cambie por zona horaria. El id se lee del evento `ObligationCreated` del receipt. Constantes compartidas en `src/lib/constants.ts`. Tests con `tsx` (devDependency).
+
 ## Fuera del MVP (no implementar sin decisión explícita)
 Sistema legal, integración bancaria, KYC, scoring, marketplace, intereses/multas, cobranza, contratos complejos, auth sofisticada (solo wallets), app móvil, programas Solana propios, bridges.
