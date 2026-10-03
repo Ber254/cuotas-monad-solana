@@ -25,7 +25,7 @@
 | Carpeta | Contenido |
 |---|---|
 | `contracts/` | Proyecto Foundry. `src/InstallmentRegistry.sol`, tests en `test/`, scripts `script/Deploy.s.sol` y `script/SeedDemo.s.sol`. |
-| `web/` | Next.js 15 (App Router, TS, Tailwind 4) + viem. `src/lib/monad.ts` (chain/cliente/explorer), `src/lib/abi.ts` (ABI generado), `src/lib/registry.ts` (lecturas tipadas + `findObligationWithInstallments`), `src/lib/format.ts` (USDC/fechas es-AR), `src/components/StatusBadge.tsx`. Páginas: `/` (listado), `/obligations/[id]` (detalle + cuotas) y `/obligations/new` (formulario + wallet; `src/lib/obligationForm.ts` validación pura, `src/lib/wallet.ts` conexión/escritura/errores; `src/components/MarkPaidButton.tsx` confirmación manual del acreedor). |
+| `web/` | Next.js 15 (App Router, TS, Tailwind 4) + viem. `src/lib/monad.ts` (chain/cliente/explorer), `src/lib/abi.ts` (ABI generado), `src/lib/registry.ts` (lecturas tipadas + `findObligationWithInstallments`), `src/lib/format.ts` (USDC/fechas es-AR), `src/components/StatusBadge.tsx`. Páginas: `/` (listado), `/obligations/[id]` (detalle + cuotas) y `/obligations/new` (formulario + wallet; `src/lib/obligationForm.ts` validación pura, `src/lib/wallet.ts` conexión/escritura/errores; `src/components/MarkPaidButton.tsx` confirmación manual del acreedor; `src/lib/solana.ts` + `src/lib/phantom.ts` + `src/components/PayWithSolanaButton.tsx` pago USDC en Solana). |
 | `scripts/` | `export-abi.sh`: compila el contrato y regenera `web/src/lib/abi.ts`. |
 | `docs/progress/` | Documentación de continuidad. |
 
@@ -77,7 +77,7 @@ La vista `InstallmentView` (lo que devuelven `getInstallment`/`getInstallments`)
 | `getObligation`, `getInstallment`, `getInstallments`, `getObligationsByBuyer`, `getObligationsBySeller`, `obligationCount` | cualquiera | lecturas |
 | `setVerifier(addr)` | owner (deployer) | cambia el verificador |
 
-## Solana (pago demostrativo) — todavía no implementado
+## Solana (pago demostrativo) — pasos 1 implementado (etapa 8); 2–4 pendientes (etapa 9)
 
 Flujo previsto (etapas 7–9 del ROADMAP):
 

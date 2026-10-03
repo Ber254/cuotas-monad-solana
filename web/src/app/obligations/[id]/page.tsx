@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkPaidButton } from "@/components/MarkPaidButton";
+import { PayWithSolanaButton } from "@/components/PayWithSolanaButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatUsdc } from "@/lib/format";
 import { chain, explorerUrl, registryAddress } from "@/lib/monad";
@@ -136,7 +137,15 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
                 </td>
                 <td>
                   {i.status !== "PAID" && (
-                    <MarkPaidButton obligationId={o.id.toString()} number={i.number} seller={o.seller} />
+                    <div className="space-y-2">
+                      <PayWithSolanaButton
+                        obligationId={o.id.toString()}
+                        number={i.number}
+                        amount={i.amount.toString()}
+                        sellerSolanaAddress={o.sellerSolanaAddress}
+                      />
+                      <MarkPaidButton obligationId={o.id.toString()} number={i.number} seller={o.seller} />
+                    </div>
                   )}
                 </td>
               </tr>
@@ -145,7 +154,7 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
         </table>
         <p className="text-xs text-white/50">
           OVERDUE se calcula al leer (impaga y vencida); no se guarda on-chain. El pago con USDC en Solana
-          todavía no está implementado (etapas 8–9); por ahora el acreedor confirma el cobro a mano.
+          se envía con Phantom (devnet) pero la cuota solo pasa a PAID cuando el acreedor la confirma a mano; la verificación automática es la etapa 9.
         </p>
       </section>
     </main>

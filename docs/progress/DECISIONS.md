@@ -53,5 +53,8 @@ Concepto: OBLIGACIÓN → CUOTAS → FINANCIAMIENTO → PAGO → CANCELACIÓN. *
 ### D17 — 2026-10-03 — Wallet compartida entre componentes y simulación previa de escrituras
 La cuenta EVM conectada se comparte vía `eth_accounts` al montar + evento `finvia:account` en `window` (sin Context ni wagmi). Antes de cada escritura de `markInstallmentPaid` se hace `simulateContract` para traducir errores custom del contrato (`NotAuthorized`, `AlreadyPaid`, `PaymentRefAlreadyUsed`…) a mensajes en español (`CONTRACT_ERRORS` en `wallet.ts`); un receipt fallido no trae el motivo. El botón "Marcar pagada" solo se ofrece a la wallet == `seller`, pero la autorización real es del contrato.
 
+### D18 — 2026-10-03 — Pago Solana: tx de 3 instrucciones, Phantom directo y confirmación por polling HTTP
+`src/lib/solana.ts` (pura): ATA idempotente del acreedor (la paga el deudor) + `transferChecked` (6 decimales, monto = `Installment.amount`) + Memo `cuotas:<obligationId>:<number>` con el pagador como signer. `src/lib/phantom.ts` usa `window.solana` (sin wallet-adapter, como D11) y confirma con `getSignatureStatuses` por polling, no websockets. El botón NO marca PAID (etapa 9). Se valida antes que la `sellerSolanaAddress` sea una wallet on-curve (las ATA de owners fuera de curva, p. ej. `1111…1`, se rechazan) y que el deudor tenga saldo USDC. Mint por defecto: USDC devnet de Circle `4zMMC9sr…ZKqt`, **sin verificar on-chain desde este entorno**; configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT`.
+
 ## Fuera del MVP (no implementar sin decisión explícita)
 Sistema legal, integración bancaria, KYC, scoring, marketplace, intereses/multas, cobranza, contratos complejos, auth sofisticada (solo wallets), app móvil, programas Solana propios, bridges.

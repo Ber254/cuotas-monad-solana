@@ -32,6 +32,12 @@ _Última actualización: 2026-10-03 (Claude Code, continuando a Devin)._
 - Bug encontrado y corregido durante la prueba: cada fila tenía su propio estado de wallet (solo una fila mostraba el botón) → ver D17.
 - **No probado:** MetaMask real, Monad Testnet, múltiples cuentas cambiando en caliente (el evento `accountsChanged` de la wallet no se escucha: tras cambiar de cuenta hay que reconectar/recargar).
 
+## Etapa 8 (hecha por Claude Code): pago de cuota con USDC en Solana — PARCIAL
+- Botón "Pagar con Solana" por cuota impaga: conecta Phantom, valida acreedor on-curve y saldo USDC, arma y envía la tx (ATA idempotente + transferChecked + memo `cuotas:<id>:<n>`), espera confirmación y muestra la firma con link al explorer devnet. La cuota sigue PENDING (D18).
+- Probado: `npm run test:solana` (construcción de la tx, decodificación de instrucciones, firma verificada, offline); E2E Chromium con Phantom y RPC simulados (`web/scripts/e2e-pay-solana.mjs`); lint/tsc/build.
+- **NO probado (importante):** ninguna tx real en Solana devnet. Desde el entorno de desarrollo `api.devnet.solana.com` devuelve 403 (proxy), así que tampoco se verificó que el mint `4zMMC9sr…` sea el USDC devnet vigente, ni Phantom real, ni la confirmación real. Hacerlo con acceso a devnet + SOL/USDC devnet (faucet.circle.com) antes de la demo.
+- Cambio colateral: `local-chain-setup.sh` ahora usa por defecto una pubkey Solana válida (on-curve) en vez de `1111…1`, que no admite ATA. Las obligaciones antiguas con `1111…1` mostrarán "no es una wallet válida" al intentar pagar.
+
 ## Probado en esta sesión (etapa 5)
 - `forge test`: 10/10 pasan.
 - `npm run lint`, `npx tsc --noEmit`, `npm run build`: pasan.
@@ -45,7 +51,7 @@ _Última actualización: 2026-10-03 (Claude Code, continuando a Devin)._
 - Nada conocido.
 
 ## Falta
-- Todo Solana: pago USDC devnet + memo (etapa 8 → `NEXT_TASK.md`) y verificador `/api/payments/confirm` (etapa 9).
+- Todo Solana: pago USDC devnet + memo (etapa 8: tx real en devnet pendiente de probar) y verificador `/api/payments/confirm` (etapa 9).
 - Deploy de `web/` en Vercel (etapa 12).
 - Todavía no hay obligaciones creadas en Monad Testnet (no se sembró la demo para no crear datos con un deudor ficticio).
 
@@ -86,10 +92,10 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 | Monad Testnet (10143) | [`0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`](https://testnet.monadexplorer.com/address/0xF7a6e0f226ecDc708Af88679F2A9a557E918C321) | `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` (= owner/deployer) | 2026-10-03, tx [`0xc4db6db4…`](https://testnet.monadexplorer.com/tx/0xc4db6db49374aff5c5c6a92b24aac41043ed19d92f9776749f8534affb4f6efd) |
 
 ## Última tarea realizada
-Etapa 7: botón de pago manual del acreedor. Antes: etapa 6 (formulario de creación), etapa 5 (detalle/listado, rebranding Finvia). Antes (Devin): base del MVP y deploy en Monad Testnet.
+Etapa 8 (parcial): pago USDC en Solana. Antes: etapa 7 (pago manual del acreedor), etapa 6 (formulario de creación), etapa 5 (detalle/listado, rebranding Finvia). Antes (Devin): base del MVP y deploy en Monad Testnet.
 
 ## Próxima tarea recomendada
-Etapa 8: pago de una cuota con USDC devnet + memo desde Phantom. Detalle en `NEXT_TASK.md`.
+Etapa 9: `/api/payments/confirm` (verificador). Detalle en `NEXT_TASK.md`.
 
 ## Credenciales
 - La clave del deployer/verifier (wallet MetaMask de Bernardo `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, solo testnet) está guardada como secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`. **Nunca** commitearla ni ponerla en variables `NEXT_PUBLIC_*`. En Claude Code / local, usarla desde una variable de entorno o `.env` (ignorado por git).
