@@ -50,5 +50,8 @@ Concepto: OBLIGACIÓN → CUOTAS → FINANCIAMIENTO → PAGO → CANCELACIÓN. *
 ### D16 — 2026-10-03 — Creación de obligación: validación en cliente espejo del contrato, sin wagmi
 `src/lib/obligationForm.ts` (pura, testeable) replica las reglas de `InvalidParams`; `src/lib/wallet.ts` usa viem + `window.ethereum` (confirma D11, no se agregó wagmi). El monto total debe dividirse exacto entre las cuotas (cuota = total / N en unidades mínimas). Primer vencimiento se guarda a mediodía UTC para que la fecha no cambie por zona horaria. El id se lee del evento `ObligationCreated` del receipt. Constantes compartidas en `src/lib/constants.ts`. Tests con `tsx` (devDependency).
 
+### D17 — 2026-10-03 — Wallet compartida entre componentes y simulación previa de escrituras
+La cuenta EVM conectada se comparte vía `eth_accounts` al montar + evento `finvia:account` en `window` (sin Context ni wagmi). Antes de cada escritura de `markInstallmentPaid` se hace `simulateContract` para traducir errores custom del contrato (`NotAuthorized`, `AlreadyPaid`, `PaymentRefAlreadyUsed`…) a mensajes en español (`CONTRACT_ERRORS` en `wallet.ts`); un receipt fallido no trae el motivo. El botón "Marcar pagada" solo se ofrece a la wallet == `seller`, pero la autorización real es del contrato.
+
 ## Fuera del MVP (no implementar sin decisión explícita)
 Sistema legal, integración bancaria, KYC, scoring, marketplace, intereses/multas, cobranza, contratos complejos, auth sofisticada (solo wallets), app móvil, programas Solana propios, bridges.

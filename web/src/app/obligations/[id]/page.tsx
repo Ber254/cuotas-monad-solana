@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MarkPaidButton } from "@/components/MarkPaidButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatUsdc } from "@/lib/format";
 import { chain, explorerUrl, registryAddress } from "@/lib/monad";
@@ -117,6 +118,7 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
               <th>Estado</th>
               <th>Pagada el</th>
               <th>Ref. de pago (Solana)</th>
+              <th>Acción</th>
             </tr>
           </thead>
           <tbody>
@@ -132,13 +134,18 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
                 <td className="font-mono break-all" data-testid="payment-ref">
                   {i.paymentRef || "—"}
                 </td>
+                <td>
+                  {i.status !== "PAID" && (
+                    <MarkPaidButton obligationId={o.id.toString()} number={i.number} seller={o.seller} />
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="text-xs text-white/50">
           OVERDUE se calcula al leer (impaga y vencida); no se guarda on-chain. El pago con USDC en Solana
-          todavía no está implementado (etapas 8–9).
+          todavía no está implementado (etapas 8–9); por ahora el acreedor confirma el cobro a mano.
         </p>
       </section>
     </main>

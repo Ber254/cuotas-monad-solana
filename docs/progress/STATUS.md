@@ -26,6 +26,12 @@ _Última actualización: 2026-10-03 (Claude Code, continuando a Devin)._
 - Tests: `cd web && set -a && . ./.env.local && set +a && npm run test:create` (lógica pura + tx real a anvil). E2E UI: `web/scripts/e2e-create-ui.mjs` (instrucciones en el encabezado).
 - **No probado:** MetaMask real (se usó una wallet inyectada que reenvía a anvil, cuenta 0 desbloqueada); creación en Monad Testnet; el rechazo en wallet (código 4001) está implementado pero no ejercitado.
 
+## Etapa 7 (hecha por Claude Code): pago manual por el acreedor
+- Columna "Acción" en `/obligations/[id]`: `MarkPaidButton` (Client Component) por cuota no pagada. Autodetecta la wallet; solo el acreedor (`seller`) ve "Marcar pagada"; pide una referencia (default `manual-<id>-<n>-<ts>`), simula, envía `markInstallmentPaid`, y refresca. Los demás ven "Solo el acreedor". Aclara que es confirmación manual sin verificar Solana.
+- Probado: E2E Chromium con wallet inyectada → anvil (`web/scripts/e2e-mark-paid.mjs <id>`); lint, tsc, build, `forge test` (10/10) y `npm run test:create`.
+- Bug encontrado y corregido durante la prueba: cada fila tenía su propio estado de wallet (solo una fila mostraba el botón) → ver D17.
+- **No probado:** MetaMask real, Monad Testnet, múltiples cuentas cambiando en caliente (el evento `accountsChanged` de la wallet no se escucha: tras cambiar de cuenta hay que reconectar/recargar).
+
 ## Probado en esta sesión (etapa 5)
 - `forge test`: 10/10 pasan.
 - `npm run lint`, `npx tsc --noEmit`, `npm run build`: pasan.
@@ -39,8 +45,7 @@ _Última actualización: 2026-10-03 (Claude Code, continuando a Devin)._
 - Nada conocido.
 
 ## Falta
-- Pago manual por el acreedor desde la UI (etapa 7 → `NEXT_TASK.md`).
-- Todo Solana: pago USDC devnet + memo, verificador `/api/payments/confirm` (etapas 8–9).
+- Todo Solana: pago USDC devnet + memo (etapa 8 → `NEXT_TASK.md`) y verificador `/api/payments/confirm` (etapa 9).
 - Deploy de `web/` en Vercel (etapa 12).
 - Todavía no hay obligaciones creadas en Monad Testnet (no se sembró la demo para no crear datos con un deudor ficticio).
 
@@ -81,10 +86,10 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 | Monad Testnet (10143) | [`0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`](https://testnet.monadexplorer.com/address/0xF7a6e0f226ecDc708Af88679F2A9a557E918C321) | `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` (= owner/deployer) | 2026-10-03, tx [`0xc4db6db4…`](https://testnet.monadexplorer.com/tx/0xc4db6db49374aff5c5c6a92b24aac41043ed19d92f9776749f8534affb4f6efd) |
 
 ## Última tarea realizada
-Etapa 6: formulario `/obligations/new` con wallet EVM. Antes: etapa 5 (detalle/listado, rebranding Finvia). Antes (Devin): base del MVP y deploy en Monad Testnet.
+Etapa 7: botón de pago manual del acreedor. Antes: etapa 6 (formulario de creación), etapa 5 (detalle/listado, rebranding Finvia). Antes (Devin): base del MVP y deploy en Monad Testnet.
 
 ## Próxima tarea recomendada
-Etapa 7: botón "Marcar como pagada" para el acreedor. Detalle en `NEXT_TASK.md`.
+Etapa 8: pago de una cuota con USDC devnet + memo desde Phantom. Detalle en `NEXT_TASK.md`.
 
 ## Credenciales
 - La clave del deployer/verifier (wallet MetaMask de Bernardo `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, solo testnet) está guardada como secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`. **Nunca** commitearla ni ponerla en variables `NEXT_PUBLIC_*`. En Claude Code / local, usarla desde una variable de entorno o `.env` (ignorado por git).
