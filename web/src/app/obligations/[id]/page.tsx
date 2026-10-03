@@ -154,7 +154,7 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
         </table>
         <p className="text-xs text-white/50">
           OVERDUE se calcula al leer (impaga y vencida); no se guarda on-chain. El pago con USDC en Solana
-          se envía con Phantom (devnet) pero la cuota solo pasa a PAID cuando el acreedor la confirma a mano; la verificación automática es la etapa 9.
+          se envía con Phantom (devnet) y el servidor verifica la tx (mint, destino, monto, memo) antes de marcar la cuota PAID en Monad. La confirmación manual del acreedor sigue disponible como respaldo.
         </p>
       </section>
     </main>

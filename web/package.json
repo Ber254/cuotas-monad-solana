@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:create": "tsx scripts/test-create-flow.mts",
-    "test:solana": "tsx scripts/test-solana-tx.mts"
+    "test:solana": "tsx scripts/test-solana-tx.mts",
+    "test:verify": "tsx scripts/test-verify-payment.mts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

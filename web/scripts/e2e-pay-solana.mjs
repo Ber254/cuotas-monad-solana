@@ -1,5 +1,7 @@
-// E2E etapa 8: Phantom y RPC de Solana simulados (devnet no es alcanzable en algunos entornos).
-// Uso: node scripts/e2e-pay-solana.mjs <id> ; <id> = obligación de 2 cuotas con sellerSolanaAddress válida (on-curve).
+// E2E etapas 8+9: Phantom y RPC de Solana (cliente) simulados; el servidor usa scripts/mock-solana-rpc.mts.
+// Requisitos: anvil + setup local; mock: MOCK_SIG=<"6"x88> MOCK_OBLIGATION=<id> MOCK_NUMBER=1 MOCK_SELLER=<pubkey on-curve> MOCK_AMOUNT=<monto> npx tsx scripts/mock-solana-rpc.mts;
+// web: VERIFIER_PRIVATE_KEY=<clave anvil 0> SOLANA_RPC_URL=http://127.0.0.1:8899 npm run start -- -p 3100.
+// Uso: node scripts/e2e-pay-solana.mjs <id> (obligación de 2 cuotas, acreedor Solana on-curve). La firma debe ser nueva en cada corrida.
 import { chromium } from "playwright-core";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -28,7 +30,7 @@ await page.addInitScript(() => {
     connect: async () => ({ publicKey: pk }),
     signAndSendTransaction: async (tx) => {
       window.__tx = { feePayer: tx.feePayer.toBase58(), ixs: tx.instructions.map(i => ({ program: i.programId.toBase58(), data: Array.from(i.data) })) };
-      return { signature: "5".repeat(88) };
+      return { signature: "6".repeat(88) };
     },
   };
 });
@@ -46,8 +48,11 @@ assert.equal(amt, BigInt(500_000_000));
 console.log("tx enviada a Phantom: 3 ix, memo", Buffer.from(tx.ixs[2].data).toString(), "monto", amt.toString());
 const href = await page.getAttribute('[data-testid="sol-signature"]', "href");
 assert.ok(href.includes("cluster=devnet")); console.log("link:", href.slice(0, 60) + "…");
-// la cuota sigue PENDING (no se marca PAID sin verificación)
-assert.equal(await page.locator('[data-testid="installment-status"]:has-text("PENDING")').count(), 2);
+// el servidor verifica la tx y marca PAID en Monad; la página se refresca sola
+await page.waitForSelector('[data-testid="installment-status"]:has-text("PAID")', { timeout: 20000 });
+assert.equal(await page.locator('[data-testid="installment-status"]:has-text("PAID")').count(), 1);
+assert.equal(await page.locator('[data-testid="payment-ref"]:has-text("6666666666")').count(), 1);
+console.log("cuota 1 → PAID (verificada por el servidor), paymentRef = firma Solana");
 // saldo insuficiente → error legible
 balance = "1"; await page.reload(); await page.waitForSelector('[data-testid="pay-solana"]');
 await page.locator('[data-testid="pay-solana"]').first().click();
