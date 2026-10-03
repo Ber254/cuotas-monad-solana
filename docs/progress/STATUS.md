@@ -8,14 +8,15 @@ _Última actualización: 2026-10-03 (Devin)._
 - Contrato `contracts/src/InstallmentRegistry.sol`: crear obligación + generar N cuotas, marcar cuota PAID (verifier o vendedor), OVERDUE derivado por tiempo, COMPLETED automático, anti doble pago y anti reuso de `paymentRef`. **10 tests `forge test` pasando.**
 - Scripts Foundry: `script/Deploy.s.sol`, `script/SeedDemo.s.sol` (obligación demo Celular, 10 × 100 USDC, mensual). Probados contra anvil.
 - `scripts/local-chain-setup.sh`: anvil → deploy → obligación demo → escribe `web/.env.local`. Probado.
-- `web/` Next.js 15 + viem: home lee red/contrato/`obligationCount` desde la cadena. Probado con anvil (muestra `1` después del seed). `lint`, `tsc` y `build` pasan.
+- `web/` Next.js 15 + viem: home lee red/contrato/`obligationCount` desde la cadena. Probado con anvil (muestra `1` después del seed) y contra Monad Testnet (muestra `0`). `lint`, `tsc` y `build` pasan.
+- **Contrato desplegado en Monad Testnet** (ver tabla "Direcciones desplegadas"). Verificado con `cast`: `owner` y `verifier` = wallet del deployer, `obligationCount` = 0.
 
 ## Funcionando
 - Flujo local: anvil + contrato + web leyendo on-chain.
+- Web leyendo el contrato real en Monad Testnet con `NEXT_PUBLIC_CHAIN_ID=10143` y `NEXT_PUBLIC_REGISTRY_ADDRESS` de la tabla.
 
 ## Parcialmente implementado
 - `web/src/lib/registry.ts`: `getObligation` y `getInstallments` existen y tipan, pero ninguna página los usa todavía.
-- Monad Testnet: config lista (chainId 10143, RPC en `foundry.toml` como `monad_testnet`), **contrato no desplegado** (falta una wallet con MON de faucet).
 
 ## Roto
 - Nada conocido.
@@ -25,7 +26,8 @@ _Última actualización: 2026-10-03 (Devin)._
 - Crear obligación desde la UI con wallet EVM (etapa 6).
 - Pago manual por el vendedor desde la UI (etapa 7).
 - Todo Solana: pago USDC devnet + memo, verificador `/api/payments/confirm` (etapas 8–9).
-- Deploy en Monad Testnet y Vercel (etapa 12).
+- Deploy de `web/` en Vercel (etapa 12).
+- Todavía no hay obligaciones creadas en Monad Testnet (no se sembró la demo para no crear datos con un comprador ficticio).
 
 ## Cómo ejecutar
 
@@ -45,10 +47,10 @@ anvil                                  # terminal 1
 cd web && npm install && npm run dev   # http://localhost:3000
 ```
 
-Deploy a Monad Testnet (cuando haya wallet con MON):
+Re-deploy a Monad Testnet (solo si cambia el contrato; registrar la nueva dirección abajo y en DECISIONS.md):
 ```bash
 cd contracts
-VERIFIER_ADDRESS=0x<verifier> forge script script/Deploy.s.sol --rpc-url monad_testnet --private-key $DEPLOYER_PK --broadcast
+VERIFIER_ADDRESS=0x<verifier> forge script script/Deploy.s.sol --rpc-url monad_testnet --private-key $MONAD_DEPLOYER_PRIVATE_KEY --broadcast
 ```
 Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NEXT_PUBLIC_REGISTRY_ADDRESS=...`) y registrarla acá.
 
@@ -61,10 +63,13 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 ## Direcciones desplegadas
 | Red | InstallmentRegistry | verifier | fecha |
 |---|---|---|---|
-| Monad Testnet | — (pendiente) | — | — |
+| Monad Testnet (10143) | [`0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`](https://testnet.monadexplorer.com/address/0xF7a6e0f226ecDc708Af88679F2A9a557E918C321) | `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` (= owner/deployer) | 2026-10-03, tx [`0xc4db6db4…`](https://testnet.monadexplorer.com/tx/0xc4db6db49374aff5c5c6a92b24aac41043ed19d92f9776749f8534affb4f6efd) |
 
 ## Última tarea realizada
-Base del MVP: estructura, docs de continuidad, contrato `InstallmentRegistry` con tests, scripts de deploy/seed, web Next.js leyendo el contrato.
+Deploy de `InstallmentRegistry` en Monad Testnet y verificación de lectura desde la web. Antes: base del MVP (estructura, docs, contrato con tests, scripts, web).
 
 ## Próxima tarea recomendada
 Página `/obligations/[id]` con la tabla de cuotas (etapa 5). Detalle en `NEXT_TASK.md`.
+
+## Credenciales
+- La clave del deployer/verifier (wallet MetaMask de Bernardo `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, solo testnet) está guardada como secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`. **Nunca** commitearla ni ponerla en variables `NEXT_PUBLIC_*`. En Claude Code / local, usarla desde una variable de entorno o `.env` (ignorado por git).

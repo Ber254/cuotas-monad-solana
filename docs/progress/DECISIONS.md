@@ -38,5 +38,8 @@ Lecturas con `publicClient` de viem; escrituras futuras con `createWalletClient(
 ### D12 — 2026-10-03 — Redes: Monad Testnet (chainId 10143) y Solana devnet; anvil para desarrollo local
 Local se usa anvil con las cuentas por defecto (`scripts/local-chain-setup.sh`). Motivo: iterar sin faucet ni claves reales.
 
+### D13 — 2026-10-03 — Deployer = owner = verifier en Monad Testnet
+El contrato `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` se desplegó con la wallet `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, que es también `verifier`. Motivo: una sola clave para la demo. Si el verificador pasa a ser otro servicio, usar `setVerifier` (no hace falta re-desplegar).
+
 ## Fuera del MVP (no implementar sin decisión explícita)
 Sistema legal, integración bancaria, KYC, scoring, marketplace, intereses/multas, cobranza, contratos complejos, auth sofisticada (solo wallets), app móvil, programas Solana propios, bridges.
