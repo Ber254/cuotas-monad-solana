@@ -45,6 +45,15 @@ await test("detalle explica dónde interviene Monad y Solana", async () => {
   assert.match(panel, /Monad — registro verificable/);
   assert.match(panel, /Solana — riel de pago/);
 });
+await test("/api/health: configuración lista y contrato legible (sin exponer secretos)", async () => {
+  const res = await fetch(`${BASE}/api/health`);
+  const body = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.ok, true);
+  assert.equal(body.config.verifierKeyConfigured, true);
+  assert.match(body.obligationCount, /^\d+$/);
+  assert.ok(!JSON.stringify(body).includes("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), "no debe exponer la clave");
+});
 await test("404 para ids inexistentes o inválidos", async () => {
   const page = await newPage();
   for (const id of ["999999", "abc", "0", "-1", "1.5"]) assert.equal((await page.goto(`${BASE}/obligations/${id}`)).status(), 404, id);

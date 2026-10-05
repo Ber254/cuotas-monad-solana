@@ -31,10 +31,13 @@ if [ -z "${E2E_SKIP_UNIT:-}" ]; then
 fi
 set -a; . ./.env.local; set +a
 
-echo "== build + servidores"
+echo "== build + chequeo de secretos del bundle"
+export VERIFIER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 npm run build >/dev/null 2>&1 || fail "build"
+npm run check:deploy || fail "check:deploy (fuga de secretos o contrato no embebido)"
+echo "== servidores"
 npx tsx scripts/mock-solana-rpc.mts > "$LOG/mock.log" 2>&1 & PIDS+=($!)
-VERIFIER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 SOLANA_RPC_URL=http://127.0.0.1:8899 \
+SOLANA_RPC_URL=http://127.0.0.1:8899 \
   npm run start -- -p 3100 > "$LOG/web.log" 2>&1 & PIDS+=($!)
 for _ in $(seq 40); do curl -s -o /dev/null localhost:3100 && break; sleep 0.5; done
 

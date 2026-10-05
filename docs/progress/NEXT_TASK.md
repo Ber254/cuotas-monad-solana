@@ -2,20 +2,21 @@
 
 ## Objetivo
 
-Cerrar la **validación con redes y wallets reales** (etapas 8, 9 y 10) siguiendo `DEMO.md` § B, y registrar el resultado. Es lo único del MVP que sigue sin probarse; todo lo demás está cubierto por `./scripts/run-local-e2e.sh` (19/19 al 2026-10-05).
+Desplegar la web (Vercel) y hacer **la corrida real de punta a punta** con Solana devnet, Monad Testnet y wallets reales. Es lo único del MVP sin probar; todo lo demás está cubierto por `./scripts/run-local-e2e.sh` (20/20 al 2026-10-05). **Requiere acciones que solo puede hacer una persona con acceso** (Vercel, wallets, faucets, redes no bloqueadas): si el agente no tiene ese acceso, debe preparar lo que falte y pedirle al usuario que ejecute los pasos de `DEPLOY.md` y `DEMO.md` § B, sin marcar nada como ✅.
 
 ## Contexto
-- Implementado y probado en local con wallets y RPC de Solana **simulados** (ver `STATUS.md` y D18–D20). Desde el entorno de desarrollo previo `api.devnet.solana.com` y `testnet-rpc.monad.xyz` no eran alcanzables (403 del proxy; reverificado 2026-10-05).
-- Riesgo principal: el formato real de `getParsedTransaction(jsonParsed)` puede diferir de las fixtures (`web/scripts/fixtures-solana.mts`, escritas según la documentación) y el verificador rechazaría pagos válidos. Segundo riesgo: el mint USDC devnet `4zMMC9sr…ZKqt` no fue verificado.
-- Necesitás: acceso a Solana devnet y Monad Testnet; Phantom (devnet) con SOL + USDC devnet (faucet.circle.com); MetaMask con MON de testnet; la clave del verifier (secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`; **nunca commitear**).
+- Etapas 1–11 hechas; la 12 está **preparada** (`DEPLOY.md`, `/api/health`, `check:deploy`) pero no desplegada. Etapas 8, 9 y 10 probadas solo con wallets y RPC de Solana simulados (D20).
+- Riesgos principales a validar primero: (a) el formato real de `getParsedTransaction(jsonParsed)` vs. las fixtures (`web/scripts/fixtures-solana.mts`): si el verificador devuelve 422 con una tx válida, ajustar `verifyPayment.ts`; (b) el mint USDC devnet `4zMMC9sr…ZKqt` sin verificar; (c) latencia: el endpoint puede superar 10 s (`maxDuration = 60`).
+- Seguridad: **no usar la clave personal del owner/deployer como verifier en Vercel** (D21, `DEPLOY.md` § 0): crear una wallet dedicada y llamar `setVerifier`.
 
 ## Pasos
-1. Probar conectividad (`getHealth` en devnet, `eth_chainId` en Monad Testnet). Si sigue bloqueada, parar: documentar y pedir al usuario correrlo en su máquina siguiendo `DEMO.md` § B.
-2. Verificar el mint USDC devnet on-chain; corregir `DEFAULT_USDC_DEVNET_MINT` / `.env.example` si hace falta.
-3. Hacer una corrida real: crear obligación en Monad Testnet (MetaMask) → pagar la cuota 1 con Phantom → confirmar que `/api/payments/confirm` la marca PAID. Si responde 422 con una tx válida, comparar con las fixtures y ajustar `verifyPayment.ts` + fixtures (y mantener `npm run test:verify` verde).
-4. Registrar en `STATUS.md`/`DEMO.md` la firma de Solana y el hash de Monad (con links a los explorers).
-5. Si todo funciona: marcar etapas 8, 9 y 10 como ✅ en `ROADMAP.md` y pasar a la etapa 12 (deploy de `web/` en Vercel con Root Directory = `web`; `VERIFIER_PRIVATE_KEY` solo como variable de servidor; las `NEXT_PUBLIC_*` se fijan en build; ojo: el rate limit en memoria no es global entre instancias).
+1. Wallet verifier dedicada + `setVerifier` + fondearla con MON (`DEPLOY.md` § 0).
+2. Verificar el mint USDC devnet (`getAccountInfo`) y corregir `DEFAULT_USDC_DEVNET_MINT` / `.env.example` si difiere.
+3. Probar el build de producción con la configuración de Testnet: `npm run build && npm run check:deploy` (con `VERIFIER_PRIVATE_KEY` definida) y `GET /api/health` (debe dar 200).
+4. Desplegar en Vercel (Root Directory = `web`, variables de `DEPLOY.md` § 1) y repetir `/api/health` sobre la URL pública.
+5. `DEMO.md` § B: crear una obligación con MetaMask, pagar la cuota 1 con Phantom, confirmar PAID. Registrar firma de Solana + hash de Monad + URL de la app en `STATUS.md`/`DEMO.md`.
+6. Si todo funciona: marcar etapas 8, 9, 10 y 12 como ✅ en `ROADMAP.md`. Si algo falla, documentarlo y corregir (manteniendo `run-local-e2e.sh` verde).
 
 ## Criterios de aceptación
-- Una cuota pagada de punta a punta con redes reales, con evidencia (firma + hash) registrada; o la lista explícita de lo que no se pudo y por qué.
-- `./scripts/run-local-e2e.sh` sigue en verde tras cualquier ajuste.
+- URL pública con `/api/health` 200 y una cuota pagada de punta a punta con redes reales (evidencia registrada), o la lista explícita de lo que no se pudo y por qué.
+- `./scripts/run-local-e2e.sh` en verde tras cualquier ajuste.

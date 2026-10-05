@@ -36,7 +36,7 @@ Requisitos: Node 20+, [Foundry](https://getfoundry.sh).
 ```bash
 (cd web && npm ci) && ./scripts/run-local-e2e.sh   # contratos + tests + E2E con wallets simuladas
 ```
-Guion de demo: [`docs/progress/DEMO.md`](docs/progress/DEMO.md).
+Guion de demo: [`docs/progress/DEMO.md`](docs/progress/DEMO.md) · Deploy: [`docs/progress/DEPLOY.md`](docs/progress/DEPLOY.md).
 
 ## Estado
 

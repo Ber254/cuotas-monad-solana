@@ -15,7 +15,7 @@ Etapas chicas e independientes. ✅ = terminada **y probada**; 🟡 = parcial; �
 | 9 | Confirmación automática: `/api/payments/confirm` | 🟡 | Probado: verificador real vs contrato en anvil (`test:onchain`) + endpoint HTTP real + E2E, con RPC Solana simulado. **Falta contra Solana real** |
 | 10 | Demo end-to-end (PYME, 10 cuotas, todas pagadas → COMPLETED) | 🟡 | Local ✅: E2E paga las 10 cuotas por Solana (simulada) → COMPLETED, con capturas y guion `DEMO.md`. **Falta la corrida con redes y wallets reales** |
 | 11 | Testing (unit del verificador Solana, e2e) | ✅ | `./scripts/run-local-e2e.sh`: forge 10/10, `test:create`, `test:solana`, `test:verify`, `test:onchain`, E2E 19/19 |
-| 12 | Deploy (Monad Testnet + Vercel para `web/`) | ⬜ | URL pública. En Vercel: Root Directory = `web` |
+| 12 | Deploy (Monad Testnet + Vercel para `web/`) | 🟡 | Contrato en Monad Testnet ✅ (Devin). Web **preparada y verificada en local** con la config de Testnet (build, `check:deploy` anti-fuga, `/api/health`, degradación sin RPC) + guía `DEPLOY.md`. **No desplegada en Vercel** (sin acceso) |
 
 Notas:
 - Las etapas 5–7 se pueden hacer contra anvil local sin Monad Testnet.

@@ -22,7 +22,8 @@ export const registryAddress = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || unde
   | Address
   | undefined;
 
-export const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+/** Timeout corto: en serverless es mejor fallar en segundos que colgar la función si el RPC no responde. */
+export const publicClient = createPublicClient({ chain, transport: http(rpcUrl, { timeout: 8_000, retryCount: 1 }) });
 
 /** URL base del explorer de Monad (undefined en anvil local). */
 export const explorerUrl = chain.blockExplorers?.default.url;

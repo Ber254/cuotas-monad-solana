@@ -18,14 +18,15 @@ Contrato `InstallmentRegistry` con 10 tests, scripts Foundry, `local-chain-setup
 | 9 | `POST /api/payments/confirm` (verificador), rate limit 30/min/IP, "Reintentar verificación" | `test:verify`, `test:onchain` (verificador real vs contrato), E2E (monto menor y memo ajeno rechazados con 422, reintento sin doble cobro, 400/404/409/429) | **`getParsedTransaction` real sin probar** (fixtures según documentación) |
 | 10 | Demo end-to-end ejecutable + guion (`DEMO.md`) + capturas (`docs/progress/demo/`) | E2E: 10 cuotas pagadas por Solana → COMPLETED | Simulada (ver arriba) |
 | 11 | Testing | batería completa `./scripts/run-local-e2e.sh` | — |
+| 12 | Preparación de deploy: `/api/health`, `error.tsx`, timeouts RPC, `runtime/maxDuration`, `check:deploy` (anti-fuga de secretos), guía `DEPLOY.md` | build con config de Testnet; `check:deploy` limpio y con 4 fugas simuladas detectadas; health 503/200; degradación sin RPC (home 200 con error, detalle 500 + pantalla de error, confirm 502); batería completa | **No desplegado en Vercel**; Testnet inalcanzable desde aquí |
 
 ## Cómo se prueba todo (un comando)
 ```bash
 # desde la raíz; requiere forge/anvil/cast, Node 20+, Chromium (PLAYWRIGHT_BROWSERS_PATH)
 (cd web && npm ci)
-./scripts/run-local-e2e.sh        # contratos + lint + tsc + tests unitarios + build + E2E (19 casos)
+./scripts/run-local-e2e.sh        # contratos + lint + tsc + tests unitarios + build + E2E (20 casos)
 ```
-Último resultado (2026-10-05): `forge test` 10/10; lint/tsc/build OK; `test:create`, `test:solana`, `test:verify`, `test:onchain` OK; **E2E 19/19**. Variables útiles: `E2E_SKIP_UNIT=1`, `E2E_ONLY=<regex de nombre de test>`. El E2E regenera las capturas de `docs/progress/demo/`.
+Último resultado (2026-10-05): `forge test` 10/10; lint/tsc/build OK; `test:create`, `test:solana`, `test:verify`, `test:onchain` OK; **E2E 20/20** (con `/api/health`). Variables útiles: `E2E_SKIP_UNIT=1`, `E2E_ONLY=<regex de nombre de test>`. El E2E regenera las capturas de `docs/progress/demo/`.
 
 Cómo funciona la simulación (importante para no confundirla con una prueba real):
 - **EVM**: `window.ethereum` falso que reenvía a anvil (cuentas desbloqueadas). **Phantom**: `window.solana` falso que, al "enviar", registra en `web/scripts/mock-solana-rpc.mts` lo que el *cliente realmente armó* (mint, destino, monto, memo). El servidor consulta ese mock como si fuera Solana y verifica contra los datos del **contrato**. Por eso la tx del cliente y el verificador del servidor quedan contrastados entre sí, pero ninguno contra Solana real.
@@ -40,7 +41,8 @@ Cómo funciona la simulación (importante para no confundirla con una prueba rea
 - Nada contra **Solana devnet** ni **Monad Testnet**; nada con **MetaMask/Phantom** reales. El formato `jsonParsed` real podría diferir de las fixtures → el verificador rechazaría pagos válidos; probar primero eso.
 - Mint USDC devnet `4zMMC9sr…ZKqt` sin verificar on-chain (configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT` / `SOLANA_USDC_MINT`).
 - El endpoint de confirmación es público: rate limit en memoria (no sirve con varias instancias, p. ej. serverless) y sin autenticación; cualquiera con una firma válida puede disparar el registro (idempotente). La identidad Solana del pagador no se liga al `buyer` EVM (D19).
-- Despliegue (Vercel, etapa 12) no hecho: las `NEXT_PUBLIC_*` se fijan en build; `VERIFIER_PRIVATE_KEY` debe ser secreto de servidor.
+- **Despliegue (etapa 12) no hecho.** Antes de desplegar leer `DEPLOY.md` § 0: la clave del verifier NO debe ser la wallet personal owner/deployer (D21). Las `NEXT_PUBLIC_*` se fijan en build.
+- Hallazgo propio al probar `check:deploy`: la primera versión daba ✓ sin comparar el secreto cuando la variable no estaba definida (falso OK). Corregido: avisa y revisa además las variables `NEXT_PUBLIC_*`.
 - La UI de Monad Testnet mostrará "Monad (Monad Testnet)"; en anvil dice "(Foundry)".
 
 ## Entorno (contenedores sin acceso a foundry.paradigm.xyz)

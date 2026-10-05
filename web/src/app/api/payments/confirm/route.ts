@@ -4,6 +4,10 @@ import { createRateLimiter } from "@/lib/rateLimit";
 import { createConfirmDeps } from "@/lib/verifier.server";
 
 export const dynamic = "force-dynamic";
+// web3.js y viem necesitan Node (no Edge). Verificar en Solana + esperar el receipt de Monad puede pasar de
+// los 10 s por defecto de Vercel Hobby; 60 s es el máximo permitido allí.
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // 30 pedidos/minuto por IP (la UI reintenta hasta 6 veces por pago).
 const allow = createRateLimiter(30, 60_000);
