@@ -40,6 +40,8 @@ VERIFIER_PRIVATE_KEY=<clave> npm run build && VERIFIER_PRIVATE_KEY=<clave> npm r
 ```
 `check:deploy` falla si la clave (o cualquier `NEXT_PUBLIC_*` con nombre/forma de secreto) llegaría al navegador, o si el contrato no quedó embebido. Probado con fugas simuladas.
 
+Antes y después de desplegar, `npm run real:preflight` (en `web/`, con las mismas variables) valida mint, contrato, saldo del verifier y que la clave sea la del verifier.
+
 Después de desplegar:
 1. `GET https://<tu-app>/api/health` → debe dar **200** con `ok: true`, `verifierKeyConfigured: true`, `obligationCount` numérico. Si da 503, `problems` dice qué falta. No expone secretos.
 2. Abrir `/`: debe mostrar red "Monad Testnet (chainId 10143)" y el contrato.

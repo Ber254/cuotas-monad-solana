@@ -26,8 +26,18 @@ Qué decir si preguntan "¿es seguro?": el contrato no custodia fondos; solo el 
 
 ## B. Demo con redes reales (PENDIENTE — no se pudo probar; hacerlo antes de presentar)
 Requisitos: Phantom en devnet con SOL y USDC devnet (faucet.circle.com), MetaMask con MON de Monad Testnet, acceso a `api.devnet.solana.com` y `testnet-rpc.monad.xyz`.
-1. Verificar el mint: `getAccountInfo` de `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZ6hZKqt` en devnet; si no es el USDC de devnet vigente, cambiar `SOLANA_USDC_MINT` y `NEXT_PUBLIC_SOLANA_USDC_MINT`.
-2. `web/.env.local`: `NEXT_PUBLIC_CHAIN_ID=10143`, `NEXT_PUBLIC_REGISTRY_ADDRESS=0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`, `VERIFIER_PRIVATE_KEY=<clave del deployer, secreto de Devin MONAD_DEPLOYER_PRIVATE_KEY>` (nunca commitear), `SOLANA_RPC_URL`.
-3. Crear la obligación desde `/obligations/new` con MetaMask (acreedor = wallet del deployer **no puede** ser el deudor); `sellerSolanaAddress` = pubkey de la wallet Phantom del acreedor.
-4. Pagar la cuota 1 con Phantom (la wallet pagadora necesita USDC devnet). Si `/api/payments/confirm` responde 422 con una tx válida: comparar el `getParsedTransaction` real con `web/scripts/fixtures-solana.mts` y ajustar `verifyPayment.ts`.
+
+**Herramientas (probadas contra la pila local; falta correrlas contra las redes reales):**
+```bash
+cd web   # con NEXT_PUBLIC_CHAIN_ID=10143, NEXT_PUBLIC_REGISTRY_ADDRESS=0xF7a6…C321, SOLANA_RPC_URL, SOLANA_USDC_MINT, VERIFIER_PRIVATE_KEY exportadas
+npm run real:preflight                                   # conectividad, mint USDC (decimales, owner), contrato, saldo del verifier,
+                                                         # y que VERIFIER_PRIVATE_KEY sea realmente el verifier (si no: NotAuthorized)
+npm run pay:devnet -- --keypair ~/.config/solana/id.json --obligation <id> --number <n> --confirm https://<app>
+                                                         # paga una cuota por CLI (misma tx que la UI) y llama al verificador
+npm run real:tx -- <firmaSolana> <obligationId> <cuota>  # contrasta una tx real con la obligación y muestra qué ve el verificador
+```
+1. `npm run real:preflight` debe terminar en ✓. Confirmar a mano que el mint es el USDC de devnet de Circle; si no, cambiar `SOLANA_USDC_MINT` y `NEXT_PUBLIC_SOLANA_USDC_MINT`.
+2. `web/.env.local`: `NEXT_PUBLIC_CHAIN_ID=10143`, `NEXT_PUBLIC_REGISTRY_ADDRESS=0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`, `VERIFIER_PRIVATE_KEY` de la wallet verifier **dedicada** (`DEPLOY.md` § 0), `SOLANA_RPC_URL`.
+3. Crear la obligación desde `/obligations/new` con MetaMask (el acreedor no puede ser el deudor); `sellerSolanaAddress` = pubkey de la wallet Phantom del acreedor (una wallet normal, no una PDA).
+4. Pagar la cuota 1 con Phantom (la pagadora necesita USDC devnet) **o** con `pay:devnet`. Si `/api/payments/confirm` responde 422 con una tx válida: `real:tx` muestra lo que devolvió Solana y por qué se rechazó; ajustar `verifyPayment.ts` y `fixtures-solana.mts`.
 5. Registrar acá la firma de Solana y el hash de Monad de la cuota pagada.

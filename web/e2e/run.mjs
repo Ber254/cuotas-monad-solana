@@ -1,7 +1,9 @@
 // Suite E2E completa (Chromium + wallets simuladas + anvil + RPC Solana simulado).
 // Se corre con scripts/run-local-e2e.sh, que levanta anvil, el mock de Solana y la web.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { ACCOUNTS, BASE, advanceDays, closeBrowser, createObligation, launch, newPage, randomOffCurvePubkey, randomSolanaPubkey, summary, test, text } from "./lib.mjs";
 
@@ -275,6 +277,21 @@ await test("endpoint: 400/404/409/422 y rate limit 429 vía HTTP real", async ()
   let last;
   for (let i = 0; i < 40; i++) last = (await post({ obligationId: "1", number: 1, signature: "7".repeat(88) })).status;
   assert.equal(last, 429, "rate limit tras 30 pedidos/min por IP");
+});
+
+await test("CLI pay:devnet: bytes firmados reales → RPC → verificador → PAID (sin navegador)", async () => {
+  const id = createObligation({ description: "E2E CLI", solana: SELLER_SOL });
+  const kp = path.join(os.tmpdir(), `finvia-e2e-payer-${process.pid}.json`);
+  fs.writeFileSync(kp, execFileSync("node", ["-e", 'const k=require("@solana/web3.js").Keypair.generate();console.log(JSON.stringify(Array.from(k.secretKey)))'], { encoding: "utf8" }));
+  const out = execFileSync("npx", ["tsx", "scripts/pay-devnet.mts", "--keypair", kp, "--obligation", id, "--number", "1", "--confirm", BASE],
+    { encoding: "utf8", env: { ...process.env, SOLANA_RPC_URL: "http://127.0.0.1:8899" } });
+  fs.rmSync(kp);
+  assert.match(out, /Confirmada en Solana/);
+  assert.match(out, /confirm intento 1: HTTP 200/);
+  const page = await newPage();
+  await goto(page, `/obligations/${id}`);
+  assert.deepEqual(await statuses(page), ["PAID", "PENDING"]);
+  assert.equal(await page.locator('[data-testid="payment-ref-link"]').count(), 1);
 });
 
 // ───────────────────────── 6. OVERDUE (viaje en el tiempo, va al final) ─────────────────────────

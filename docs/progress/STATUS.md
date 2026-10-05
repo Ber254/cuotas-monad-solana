@@ -24,9 +24,9 @@ Contrato `InstallmentRegistry` con 10 tests, scripts Foundry, `local-chain-setup
 ```bash
 # desde la raíz; requiere forge/anvil/cast, Node 20+, Chromium (PLAYWRIGHT_BROWSERS_PATH)
 (cd web && npm ci)
-./scripts/run-local-e2e.sh        # contratos + lint + tsc + tests unitarios + build + E2E (20 casos)
+./scripts/run-local-e2e.sh        # contratos + lint + tsc + tests unitarios + build + E2E (21 casos)
 ```
-Último resultado (2026-10-05): `forge test` 10/10; lint/tsc/build OK; `test:create`, `test:solana`, `test:verify`, `test:onchain` OK; **E2E 20/20** (con `/api/health`). Variables útiles: `E2E_SKIP_UNIT=1`, `E2E_ONLY=<regex de nombre de test>`. El E2E regenera las capturas de `docs/progress/demo/`.
+Último resultado (2026-10-05): `forge test` 10/10; lint/tsc/build OK; `test:create`, `test:solana`, `test:verify`, `test:onchain` OK; **E2E 21/21** (con `/api/health` y `pay:devnet`). Variables útiles: `E2E_SKIP_UNIT=1`, `E2E_ONLY=<regex de nombre de test>`. El E2E regenera las capturas de `docs/progress/demo/`.
 
 Cómo funciona la simulación (importante para no confundirla con una prueba real):
 - **EVM**: `window.ethereum` falso que reenvía a anvil (cuentas desbloqueadas). **Phantom**: `window.solana` falso que, al "enviar", registra en `web/scripts/mock-solana-rpc.mts` lo que el *cliente realmente armó* (mint, destino, monto, memo). El servidor consulta ese mock como si fuera Solana y verifica contra los datos del **contrato**. Por eso la tx del cliente y el verificador del servidor quedan contrastados entre sí, pero ninguno contra Solana real.
@@ -36,6 +36,9 @@ Cómo funciona la simulación (importante para no confundirla con una prueba rea
 - Rechazo del usuario al firmar salía en inglés ("User rejected the request."): viem anida el 4001.
 - Detalle desbordaba en móvil (468px en 390px) y "10" + "1.000" se leían "101.000".
 - **Error mío corregido:** documenté que `1111…1` (system program) no admitía ATA; es falso, **está on-curve** y el pago funcionó. Las que no admiten ATA son direcciones fuera de curva (PDAs). Ahora el formulario rechaza esas al crear la obligación y el pago las rechaza también (y hay tests con una PDA real).
+
+## Herramientas para validar contra redes reales (listas, probadas solo en local)
+`npm run real:preflight` (conectividad, mint, contrato, verifier/saldo/clave), `npm run pay:devnet` (paga una cuota por CLI con keypair: bytes firmados reales → RPC → verificador) y `npm run real:tx` (diagnostica una tx real vs la obligación). Cubiertas en la batería: preflight con clave correcta/equivocada/RPC caído, `real:tx` con pago válido/memo incorrecto/firma inexistente, y `pay:devnet` de punta a punta contra el mock (que decodifica y verifica la firma de los bytes enviados). El verificador ignora instrucciones extra (compute budget, sin parsear) que Phantom pueda agregar (test).
 
 ## Sin probar / riesgos (honesto)
 - Nada contra **Solana devnet** ni **Monad Testnet**; nada con **MetaMask/Phantom** reales. El formato `jsonParsed` real podría diferir de las fixtures → el verificador rechazaría pagos válidos; probar primero eso.

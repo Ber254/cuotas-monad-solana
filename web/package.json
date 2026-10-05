@@ -12,7 +12,10 @@
     "test:verify": "tsx scripts/test-verify-payment.mts",
     "test:onchain": "tsx scripts/test-verifier-onchain.mts",
     "test:e2e": "../scripts/run-local-e2e.sh",
-    "check:deploy": "node scripts/check-deploy.mjs"
+    "check:deploy": "node scripts/check-deploy.mjs",
+    "real:preflight": "tsx scripts/real-network-check.mts preflight",
+    "real:tx": "tsx scripts/real-network-check.mts tx",
+    "pay:devnet": "tsx scripts/pay-devnet.mts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

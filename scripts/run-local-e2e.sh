@@ -13,7 +13,7 @@ fail() { echo "✗ $1"; exit 1; }
 LOG="${TMPDIR:-/tmp}/finvia-e2e"; mkdir -p "$LOG"
 
 if [ -z "${E2E_SKIP_UNIT:-}" ]; then
-  echo "== contratos"; (cd "$ROOT/contracts" && forge test 2>&1 | grep -E "Suite result|FAIL") || fail "forge test"
+  echo "== contratos"; (cd "$ROOT/contracts" && forge test 2>&1 | tee "$LOG/forge.log" | grep -E "Suite result|FAIL"; [ "${PIPESTATUS[0]}" -eq 0 ]) || fail "forge test"
 fi
 
 echo "== anvil + deploy + obligación demo"
@@ -26,8 +26,10 @@ if [ -z "${E2E_SKIP_UNIT:-}" ]; then
   echo "== lint + tsc"; npm run lint >/dev/null 2>&1 || fail "lint"; npx tsc --noEmit || fail "tsc"
   echo "== tests unitarios"
   set -a; . ./.env.local; set +a
-  npm run test:create 2>&1 | tail -2; npm run test:solana 2>&1 | tail -1; npm run test:verify 2>&1 | tail -2
-  npm run test:onchain 2>&1 | tail -3 || fail "test:onchain"
+  for t in create solana verify onchain; do
+    npm run "test:$t" 2>&1 | tail -3
+    [ "${PIPESTATUS[0]}" -eq 0 ] || fail "test:$t"
+  done
 fi
 set -a; . ./.env.local; set +a
 

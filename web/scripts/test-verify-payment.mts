@@ -27,6 +27,14 @@ for (const [name, o] of Object.entries({
   "tx fallida": { err: { InstructionError: [0, "Custom"] } },
 })) assert.equal(v(o).ok, false, name);
 assert.equal(verifyPaymentTx(null, exp).ok, false);
+// Phantom/RPC pueden agregar instrucciones (compute budget, sin parsear): no deben afectar
+{
+  const tx = parsedPaymentTx(base);
+  tx.transaction.message.instructions.unshift(
+    { programId: Keypair.generate().publicKey, accounts: [], data: "3DdGGhkhJbjm" } as never,
+    { program: "unknown", programId: Keypair.generate().publicKey, parsed: { type: "setComputeUnitLimit" } } as never);
+  assert.equal(verifyPaymentTx(tx, exp).ok, true, "instrucciones extra ignoradas");
+}
 console.log("verifyPaymentTx: OK (1 válido + 9 inválidos rechazados)");
 
 // --- núcleo del endpoint con dependencias simuladas
