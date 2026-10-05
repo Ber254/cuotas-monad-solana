@@ -59,7 +59,7 @@ export default function NewObligationPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl p-8 space-y-6">
+    <main className="mx-auto max-w-3xl p-4 sm:p-8 space-y-6">
       <Link href="/" className="text-sm text-white/60 hover:underline">
         ← Volver
       </Link>

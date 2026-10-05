@@ -1,6 +1,7 @@
 // Prueba la lógica del formulario (pura) y, si hay anvil en NEXT_PUBLIC_MONAD_RPC_URL, crea una
 // obligación real con los mismos args que enviaría la UI. Uso: npm run test:create
 import assert from "node:assert/strict";
+import { PublicKey } from "@solana/web3.js";
 import { createPublicClient, createWalletClient, http, parseEventLogs } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
@@ -29,6 +30,9 @@ assert.equal(ok.schedule.length, 10);
 assert.equal(ok.schedule[1].dueDate - ok.schedule[0].dueDate, BigInt(30 * 86400));
 assert.equal(ok.schedule[0].dueDate, ok.args[5]);
 bad({ description: " " }); bad({ buyer: "0x123" }); bad({ buyer: ALICE }); bad({ buyer: "0x" + "0".repeat(40) });
+const PDA = PublicKey.findProgramAddressSync([Buffer.from("x")], new PublicKey("11111111111111111111111111111111"))[0].toBase58();
+bad({ sellerSolanaAddress: PDA }); // fuera de curva: no se podría pagar nunca
+assert.ok(parseObligationForm({ ...base, sellerSolanaAddress: "11111111111111111111111111111111" }, ALICE, NOW).ok, "1111…1 es on-curve");
 bad({ sellerSolanaAddress: "" }); bad({ sellerSolanaAddress: "0OIl" + "1".repeat(30) });
 bad({ installmentCount: "0" }); bad({ installmentCount: "61" }); bad({ installmentCount: "abc" });
 bad({ totalUsdc: "0" }); bad({ totalUsdc: "-5" }); bad({ totalUsdc: "10000.0000001" });

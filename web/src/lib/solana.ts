@@ -20,6 +20,11 @@ export function paymentMemo(obligationId: bigint | string, number: number): stri
   return `cuotas:${obligationId}:${number}`;
 }
 
+/** ¿Parece una firma de tx de Solana (base58, 64–90 chars)? Las refs manuales no lo son. */
+export function isSolanaSignature(ref: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{64,90}$/.test(ref);
+}
+
 export function explorerTxUrl(signature: string): string {
   return `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
 }

@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test:create": "tsx scripts/test-create-flow.mts",
     "test:solana": "tsx scripts/test-solana-tx.mts",
-    "test:verify": "tsx scripts/test-verify-payment.mts"
+    "test:verify": "tsx scripts/test-verify-payment.mts",
+    "test:onchain": "tsx scripts/test-verifier-onchain.mts",
+    "test:e2e": "../scripts/run-local-e2e.sh"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",
@@ -27,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.27",
+    "playwright-core": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"

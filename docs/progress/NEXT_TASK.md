@@ -2,17 +2,20 @@
 
 ## Objetivo
 
-Etapa 10: dejar la **demo end-to-end** ejecutable y documentada (guion en `STATUS.md` o `docs/progress/DEMO.md`): una PYME recibe USD 10.000, 10 cuotas de 1.000 USDC; se paga una cuota por Solana y el servidor la marca PAID; se completa la obligación. Y, como parte de la tarea, **cerrar la validación real de las etapas 8–9** si hay acceso a Solana devnet.
+Cerrar la **validación con redes y wallets reales** (etapas 8, 9 y 10) siguiendo `DEMO.md` § B, y registrar el resultado. Es lo único del MVP que sigue sin probarse; todo lo demás está cubierto por `./scripts/run-local-e2e.sh` (19/19 al 2026-10-05).
 
 ## Contexto
-- Etapas 1–9 implementadas (8 y 9 probadas solo con Phantom/RPC simulados; ver `STATUS.md` y D18–D19). Contrato sin cambios; desplegado en Monad Testnet `0xF7a6e0f2…C321` (sin obligaciones).
-- Hace falta acceso a: Solana devnet (`https://api.devnet.solana.com`; desde el entorno de desarrollo previo devolvía 403 por proxy), Phantom (devnet) con SOL devnet y USDC devnet (faucet.circle.com), y MetaMask con MON de testnet (faucet de Monad). Si no hay acceso, hacer todo en local (anvil + mocks) y dejar claro en la documentación qué sigue sin probarse.
-- Pasos de validación real: (1) verificar el mint USDC devnet (`getAccountInfo` del mint; si difiere, corregir `DEFAULT_USDC_DEVNET_MINT` y `.env.example`); (2) crear una obligación (UI `/obligations/new`) con la `sellerSolanaAddress` = wallet Phantom del acreedor; (3) pagar la cuota 1 con Phantom; (4) verificar que `/api/payments/confirm` acepta una tx real — si el formato `jsonParsed` real difiere de las fixtures (`web/scripts/fixtures-solana.mts`), ajustar `verifyPayment.ts` y las fixtures; (5) repetir en Monad Testnet con `VERIFIER_PRIVATE_KEY` (secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`; nunca commitear).
-- Mejoras pequeñas aceptables si sobra tiempo: indicar en la UI qué acción hace cada cadena (etiquetas "Monad: registro" / "Solana: pago"), y un rate limit simple en el endpoint (D19).
-- `tsconfig` target ES2017: no usar literales `1n`. Para correr foundry sin acceso a `foundryup`, ver "Entorno" en `STATUS.md`.
+- Implementado y probado en local con wallets y RPC de Solana **simulados** (ver `STATUS.md` y D18–D20). Desde el entorno de desarrollo previo `api.devnet.solana.com` y `testnet-rpc.monad.xyz` no eran alcanzables (403 del proxy; reverificado 2026-10-05).
+- Riesgo principal: el formato real de `getParsedTransaction(jsonParsed)` puede diferir de las fixtures (`web/scripts/fixtures-solana.mts`, escritas según la documentación) y el verificador rechazaría pagos válidos. Segundo riesgo: el mint USDC devnet `4zMMC9sr…ZKqt` no fue verificado.
+- Necesitás: acceso a Solana devnet y Monad Testnet; Phantom (devnet) con SOL + USDC devnet (faucet.circle.com); MetaMask con MON de testnet; la clave del verifier (secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`; **nunca commitear**).
+
+## Pasos
+1. Probar conectividad (`getHealth` en devnet, `eth_chainId` en Monad Testnet). Si sigue bloqueada, parar: documentar y pedir al usuario correrlo en su máquina siguiendo `DEMO.md` § B.
+2. Verificar el mint USDC devnet on-chain; corregir `DEFAULT_USDC_DEVNET_MINT` / `.env.example` si hace falta.
+3. Hacer una corrida real: crear obligación en Monad Testnet (MetaMask) → pagar la cuota 1 con Phantom → confirmar que `/api/payments/confirm` la marca PAID. Si responde 422 con una tx válida, comparar con las fixtures y ajustar `verifyPayment.ts` + fixtures (y mantener `npm run test:verify` verde).
+4. Registrar en `STATUS.md`/`DEMO.md` la firma de Solana y el hash de Monad (con links a los explorers).
+5. Si todo funciona: marcar etapas 8, 9 y 10 como ✅ en `ROADMAP.md` y pasar a la etapa 12 (deploy de `web/` en Vercel con Root Directory = `web`; `VERIFIER_PRIVATE_KEY` solo como variable de servidor; las `NEXT_PUBLIC_*` se fijan en build; ojo: el rate limit en memoria no es global entre instancias).
 
 ## Criterios de aceptación
-- Guion de demo paso a paso (comandos, cuentas, qué se ve en pantalla y dónde intervienen Monad y Solana) y probado siguiendo el guion literalmente.
-- Resultado real documentado: tx de Solana (firma + explorer) y tx de Monad (hash + explorer) de al menos una cuota pagada end-to-end, o la lista explícita de lo que no se pudo probar y por qué.
-- `npm run lint`, `npx tsc --noEmit`, `npm run build`, `forge test`, `npm run test:create`, `test:solana`, `test:verify` siguen pasando.
-- Actualizar `STATUS.md`, `ROADMAP.md` (etapas 8, 9, 10) y este archivo (próxima: etapa 12, deploy en Vercel con Root Directory = `web`; etapa 11 de testing se considera cubierta por los scripts `test:*` salvo decisión contraria).
+- Una cuota pagada de punta a punta con redes reales, con evidencia (firma + hash) registrada; o la lista explícita de lo que no se pudo y por qué.
+- `./scripts/run-local-e2e.sh` sigue en verde tras cualquier ajuste.

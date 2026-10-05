@@ -4,6 +4,7 @@ import { MarkPaidButton } from "@/components/MarkPaidButton";
 import { PayWithSolanaButton } from "@/components/PayWithSolanaButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatUsdc } from "@/lib/format";
+import { explorerTxUrl, isSolanaSignature } from "@/lib/solana";
 import { chain, explorerUrl, registryAddress } from "@/lib/monad";
 import { findObligationWithInstallments } from "@/lib/registry";
 
@@ -28,14 +29,14 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
   const next = installments.find((i) => i.status !== "PAID");
 
   return (
-    <main className="mx-auto max-w-4xl p-8 space-y-6">
+    <main className="mx-auto max-w-4xl p-4 sm:p-8 space-y-6">
       <Link href="/" className="text-sm text-white/60 hover:underline">
         ← Volver
       </Link>
 
       <header className="space-y-2">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-xl sm:text-2xl font-bold">
             Obligación #{o.id.toString()} — {o.description}
           </h1>
           <StatusBadge status={o.status} testId="obligation-status" />
@@ -51,6 +52,23 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
           )}
         </p>
       </header>
+
+      <section className="grid gap-3 text-sm sm:grid-cols-2" data-testid="chains-panel">
+        <div className="rounded border border-purple-400/30 bg-purple-500/5 p-3">
+          <div className="font-semibold text-purple-200">Monad — registro verificable</div>
+          <p className="text-white/70">
+            La obligación, sus cuotas, vencimientos y estados (PENDING / PAID / OVERDUE / COMPLETED) viven en el
+            contrato. Cada cambio de estado es una transacción en Monad.
+          </p>
+        </div>
+        <div className="rounded border border-emerald-400/30 bg-emerald-500/5 p-3">
+          <div className="font-semibold text-emerald-200">Solana — riel de pago</div>
+          <p className="text-white/70">
+            Cada cuota se paga en USDC con una transferencia en Solana + memo. El servidor verifica ese pago y
+            recién entonces la cuota pasa a PAID en Monad.
+          </p>
+        </div>
+      </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
         <dl className="rounded border border-white/15 p-4 text-sm space-y-2">
@@ -97,7 +115,7 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
           </div>
           <div className="flex justify-between">
             <dt className="text-white/60">Cuotas vencidas</dt>
-            <dd className={overdue ? "text-red-300" : undefined}>{overdue}</dd>
+            <dd className={overdue ? "text-red-300" : undefined} data-testid="overdue-count">{overdue}</dd>
           </div>
           <div className="h-2 w-full overflow-hidden rounded bg-white/10">
             <div
@@ -110,30 +128,37 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">Cuotas</h2>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[40rem] text-sm">
           <thead className="text-left text-white/60">
             <tr className="border-b border-white/15">
-              <th className="py-2">N°</th>
+              <th className="py-2 pr-3">N°</th>
               <th>Monto (USDC)</th>
               <th>Vencimiento</th>
-              <th>Estado</th>
+              <th>Estado (Monad)</th>
               <th>Pagada el</th>
-              <th>Ref. de pago (Solana)</th>
+              <th>Pago (Solana)</th>
               <th>Acción</th>
             </tr>
           </thead>
           <tbody>
             {installments.map((i) => (
               <tr key={i.number} className="border-b border-white/5" data-testid="installment-row">
-                <td className="py-2">{i.number}</td>
+                <td className="py-2 pr-3">{i.number}</td>
                 <td>{formatUsdc(i.amount)}</td>
                 <td>{formatDate(i.dueDate)}</td>
                 <td>
                   <StatusBadge status={i.status} testId="installment-status" />
                 </td>
                 <td>{i.paidAt > BigInt(0) ? formatDate(i.paidAt) : "—"}</td>
-                <td className="font-mono break-all" data-testid="payment-ref">
-                  {i.paymentRef || "—"}
+                <td className="font-mono break-all" data-testid="payment-ref" title={i.paymentRef}>
+                  {isSolanaSignature(i.paymentRef) ? (
+                    <a className="underline" href={explorerTxUrl(i.paymentRef)} target="_blank" data-testid="payment-ref-link">
+                      {i.paymentRef.slice(0, 12)}…
+                    </a>
+                  ) : (
+                    i.paymentRef || "—"
+                  )}
                 </td>
                 <td>
                   {i.status !== "PAID" && (
@@ -152,6 +177,7 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
             ))}
           </tbody>
         </table>
+        </div>
         <p className="text-xs text-white/50">
           OVERDUE se calcula al leer (impaga y vencida); no se guarda on-chain. El pago con USDC en Solana
           se envía con Phantom (devnet) y el servidor verifica la tx (mint, destino, monto, memo) antes de marcar la cuota PAID en Monad. La confirmación manual del acreedor sigue disponible como respaldo.

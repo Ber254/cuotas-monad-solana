@@ -28,7 +28,7 @@ async function readData(): Promise<HomeData> {
 export default async function Home() {
   const { count, obligations } = await readData();
   return (
-    <main className="mx-auto max-w-3xl p-8 space-y-6">
+    <main className="mx-auto max-w-3xl p-4 sm:p-8 space-y-6">
       <h1 className="text-3xl font-bold">Finvia</h1>
       <p>
         Financiamiento para PYMEs: cada obligación de pago se divide en cuotas registradas en <b>Monad</b>{" "}

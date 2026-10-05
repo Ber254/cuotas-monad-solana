@@ -88,6 +88,9 @@ export function errorMessage(e: unknown): string {
   const err = e as { shortMessage?: string; message?: string; code?: number };
   if (err.code === 4001) return "Rechazaste la operación en la wallet.";
   if (e instanceof BaseError) {
+    // viem anida el rechazo del usuario (code 4001) dentro de TransactionExecutionError, etc.
+    if (e.walk((x) => (x as { code?: number }).code === 4001 || (x as Error).name === "UserRejectedRequestError"))
+      return "Rechazaste la operación en la wallet.";
     const revert = e.walk((x) => x instanceof ContractFunctionRevertedError);
     const name = revert instanceof ContractFunctionRevertedError ? revert.data?.errorName : undefined;
     if (name && CONTRACT_ERRORS[name]) return CONTRACT_ERRORS[name];

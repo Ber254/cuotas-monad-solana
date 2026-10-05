@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { confirmPayment } from "@/lib/confirmPayment";
+import { createRateLimiter } from "@/lib/rateLimit";
 import { createConfirmDeps } from "@/lib/verifier.server";
 
 export const dynamic = "force-dynamic";
 
+// 30 pedidos/minuto por IP (la UI reintenta hasta 6 veces por pago).
+const allow = createRateLimiter(30, 60_000);
+
 /** POST { obligationId, number, signature }: verifica el pago en Solana y marca la cuota PAID en Monad. */
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
+  if (!allow(ip)) return NextResponse.json({ error: "Demasiados pedidos; probá de nuevo en un minuto." }, { status: 429 });
   let body: Record<string, unknown>;
   try {
     body = await req.json();

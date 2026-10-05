@@ -30,7 +30,13 @@ export function MarkPaidButton({
     getConnectedAccount().then(setAccount, () => undefined);
     const onAccount = (e: Event) => setAccount((e as CustomEvent<Address>).detail);
     window.addEventListener(ACCOUNT_EVENT, onAccount);
-    return () => window.removeEventListener(ACCOUNT_EVENT, onAccount);
+    // Cambio de cuenta desde la wallet (MetaMask emite `accountsChanged`).
+    const onAccountsChanged = (accounts: unknown) => setAccount((accounts as Address[])[0]);
+    window.ethereum?.on?.("accountsChanged", onAccountsChanged);
+    return () => {
+      window.removeEventListener(ACCOUNT_EVENT, onAccount);
+      window.ethereum?.removeListener?.("accountsChanged", onAccountsChanged);
+    };
   }, []);
 
   async function onConnect() {

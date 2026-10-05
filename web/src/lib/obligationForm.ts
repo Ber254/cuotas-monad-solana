@@ -1,3 +1,4 @@
+import { PublicKey } from "@solana/web3.js";
 import { getAddress, isAddress, parseUnits, type Address } from "viem";
 import { MAX_INSTALLMENTS, SECONDS_PER_DAY, USDC_DECIMALS } from "./constants";
 
@@ -21,6 +22,15 @@ export type CreateObligationArgs = readonly [string, Address, string, bigint, nu
 export type ParsedObligation =
   | { ok: true; args: CreateObligationArgs; schedule: { number: number; dueDate: bigint }[] }
   | { ok: false; errors: string[] };
+
+/** ¿Pubkey válida y on-curve? Las ATA de owners fuera de curva (PDAs) no se pueden crear en el flujo de pago. */
+function isSolanaWallet(addr: string): boolean {
+  try {
+    return PublicKey.isOnCurve(new PublicKey(addr).toBytes());
+  } catch {
+    return false;
+  }
+}
 
 const BASE58_PUBKEY = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -51,6 +61,8 @@ export function parseObligationForm(
 
   const solana = v.sellerSolanaAddress.trim();
   if (!BASE58_PUBKEY.test(solana)) errors.push("La cuenta Solana del acreedor debe ser una pubkey base58 (32–44 caracteres).");
+  else if (!isSolanaWallet(solana))
+    errors.push("La cuenta Solana del acreedor debe ser una wallet (una cuenta PDA/programa no puede recibir USDC con este flujo).");
 
   let count = 0;
   if (!/^\d+$/.test(v.installmentCount.trim())) errors.push("La cantidad de cuotas debe ser un entero.");

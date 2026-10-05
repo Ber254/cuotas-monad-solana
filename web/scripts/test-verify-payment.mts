@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Keypair } from "@solana/web3.js";
 import { confirmPayment, type ConfirmDeps } from "../src/lib/confirmPayment";
 import { DEFAULT_USDC_DEVNET_MINT as MINT } from "../src/lib/solana";
+import { createRateLimiter } from "../src/lib/rateLimit";
 import { verifyPaymentTx } from "../src/lib/verifyPayment";
 import { SIG, parsedPaymentTx } from "./fixtures-solana.mjs";
 
@@ -50,3 +51,11 @@ r = await call({}, deps({ markPaid: async () => { throw Object.assign(new Error(
 r = await call({}, deps({ markPaid: async () => { throw new Error("rpc caído"); } })); assert.equal(r.status, 502);
 assert.deepEqual(marked, [], "nunca se llama a markPaid si algo falla antes");
 console.log("confirmPayment: OK (200, 400, 404, 409, 422, 502; no escribe en cadena ante datos inválidos)");
+
+// --- rate limiter
+let clock = 0;
+const allow = createRateLimiter(3, 1000, () => clock);
+assert.deepEqual([1, 2, 3, 4, 5].map(() => allow("ip-a")), [true, true, true, false, false]);
+assert.equal(allow("ip-b"), true, "otra IP no se ve afectada");
+clock = 1000; assert.equal(allow("ip-a"), true, "la ventana se reinicia");
+console.log("rateLimit: OK");

@@ -2,7 +2,7 @@
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Keypair, PublicKey, type ParsedTransactionWithMeta } from "@solana/web3.js";
 
-export const SIG = process.env.MOCK_SIG ?? "5".repeat(88);
+export const SIG = "5".repeat(88);
 export function parsedPaymentTx(o: {
   mint: string; seller: string; amount: bigint; obligationId: string; number: number;
   payer?: string; memo?: string; destination?: string; decimals?: number; err?: unknown; noMemo?: boolean;
