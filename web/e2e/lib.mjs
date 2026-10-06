@@ -9,6 +9,7 @@ export const ANVIL = "http://127.0.0.1:8545";
 export const ACCOUNTS = {
   seller: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // anvil 0: acreedor y verifier
   pyme: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", // anvil 1: PYME deudora
+  carol: "0x90F79bf6EB2c4f870365E785982E1f101E93b906", // anvil 3: nuevo acreedor (cesión)
 };
 const SELLER_PK = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const root = path.resolve(import.meta.dirname, "..");
@@ -46,7 +47,7 @@ export const closeBrowser = () => browser?.close();
 /**
  * Página con wallets simuladas.
  * evm: false | { account, startConnected, wrongChain, unknownChain, rejectConnect, rejectSend }
- * phantom: false | { rejectConnect, rejectSend, amountDelta, memoOverride }
+ * phantom: false | { rejectConnect, rejectSend, amountDelta, memoOverride, destinationOverride }
  * solBalance: saldo USDC (unidades mínimas) que devuelve el RPC de Solana del cliente.
  */
 export async function newPage({ evm = false, phantom = false, solBalance = "5000000000", viewport } = {}) {
@@ -114,7 +115,7 @@ export async function newPage({ evm = false, phantom = false, solBalance = "5000
           const sig = Array.from({ length: 88 }, () => A[Math.floor(Math.random() * A.length)]).join("");
           // Registra en el RPC simulado lo que el cliente REALMENTE envió (con manipulación opcional).
           await fetch("http://127.0.0.1:8899/__register", { method: "POST", body: JSON.stringify({
-            signature: sig, mint: transfer.keys[1].pubkey.toBase58(), destination: transfer.keys[2].pubkey.toBase58(),
+            signature: sig, mint: transfer.keys[1].pubkey.toBase58(), destination: o.destinationOverride ?? transfer.keys[2].pubkey.toBase58(),
             authority: pk.toBase58(), amount: (amount - BigInt(o.amountDelta || 0)).toString(),
             memo: o.memoOverride ?? new TextDecoder().decode(memoIx.data) }) });
           return { signature: sig };
@@ -144,3 +145,9 @@ export const text = async (page, sel) => (await page.locator(sel).first().innerT
 export const randomOffCurvePubkey = () => execFileSync("node", ["-e",
   'const w=require("@solana/web3.js");console.log(w.PublicKey.findProgramAddressSync([Buffer.from(String(Math.random()))],w.Keypair.generate().publicKey)[0].toBase58())'],
   { cwd: root, encoding: "utf8" }).trim();
+
+/** ATA de USDC (devnet) de una pubkey de Solana, calculada fuera del navegador. */
+export const usdcAtaOf = (owner) => execFileSync("node", ["-e",
+  `const w=require("@solana/web3.js"),t=require("@solana/spl-token");console.log(t.getAssociatedTokenAddressSync(new w.PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"),new w.PublicKey(process.argv[1])).toBase58())`, owner],
+  { cwd: root, encoding: "utf8" }).trim();
+export { cast };

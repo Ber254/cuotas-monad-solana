@@ -2,7 +2,7 @@
 
 ## Qué construimos
 
-**Finvia**: infraestructura de financiamiento para PYMEs. Una obligación de pago se estructura en cuotas, se registra en Monad y cada cuota se paga en USDC sobre Solana. Ejemplo demo: una PYME (`buyer`, deudora) recibe USD 10.000 de un acreedor/inversor (`seller`) y los devuelve en 10 cuotas mensuales de 1.000 USDC. Ver D14 sobre la nomenclatura `seller`/`buyer` vs acreedor/deudor.
+**Finvia**: financiamiento de proveedores para PYMEs. Una PYME le compra mercadería a un proveedor, que le da crédito: la PYME firma N **pagarés** (promesas de pago = cuotas) que se registran en Monad; cada pagaré se paga en USDC sobre Solana; y el proveedor puede **ceder** pagarés a un tercero (que pasa a cobrarlos). Ejemplo demo: compra de USD 10.000 en 10 pagarés mensuales de 1.000 USDC. En el contrato, el proveedor es `seller` (acreedor original) y la PYME es `buyer` (deudora); no hay un inversor que entregue dinero (D14, corregido en D22).
 
 ## Componentes
 
@@ -60,8 +60,10 @@ Contrato `InstallmentRegistry` (Solidity 0.8.28). **No custodia fondos.**
 | dueDate | uint64 | `firstDueDate + (number-1) * interval` |
 | paid / paidAt | bool / uint64 | |
 | paymentRef | string | firma de la tx Solana (o comprobante manual) |
+| creditor | address | acreedor ACTUAL si el pagaré fue cedido; `address(0)` = el `seller` original (no se guarda nada extra hasta ceder, para no encarecer el gas) |
+| creditorSolanaAddress | string | cuenta Solana del acreedor cedido; vacío = `sellerSolanaAddress` de la obligación |
 
-La vista `InstallmentView` (lo que devuelven `getInstallment`/`getInstallments`) agrega `status`, `buyer` y `seller`.
+La vista `InstallmentView` (lo que devuelven `getInstallment`/`getInstallments`) agrega `status`, `buyer`, `seller` (original) y los campos **resueltos** `creditor` y `creditorSolanaAddress` (= acreedor actual y dónde debe pagarse ese pagaré).
 
 ### Estados
 
@@ -73,17 +75,18 @@ La vista `InstallmentView` (lo que devuelven `getInstallment`/`getInstallments`)
 | función | quién | efecto |
 |---|---|---|
 | `createObligation(description, buyer, sellerSolanaAddress, installmentAmount, installmentCount, firstDueDate, interval)` | vendedor | crea obligación + N cuotas, emite `ObligationCreated` |
-| `markInstallmentPaid(obligationId, number, paymentRef)` | `verifier` o el vendedor | marca PAID, rechaza doble pago y `paymentRef` repetido, emite `InstallmentPaid` y `ObligationCompleted` |
-| `getObligation`, `getInstallment`, `getInstallments`, `getObligationsByBuyer`, `getObligationsBySeller`, `obligationCount` | cualquiera | lecturas |
+| `markInstallmentPaid(obligationId, number, paymentRef)` | `verifier` o el **acreedor actual de ese pagaré** | marca PAID, rechaza doble pago y `paymentRef` repetido, emite `InstallmentPaid` y `ObligationCompleted`. Tras una cesión, el vendedor original ya no puede marcar esa cuota |
+| `transferInstallments(obligationId, numbers[], newCreditor, newCreditorSolanaAddress)` | acreedor actual de **todas** las cuotas indicadas | cede pagarés impagos (atómico: si uno falla, ninguno se cede). El deudor no puede ser el nuevo acreedor; no vale cederse a sí mismo; emite `InstallmentTransferred`. El precio de la cesión es off-chain |
+| `getObligation`, `getInstallment`, `getInstallments`, `getObligationsByBuyer`, `getObligationsBySeller`, `getObligationsByCreditor` (obligaciones donde la dirección recibió pagarés por cesión), `obligationCount` | cualquiera | lecturas |
 | `setVerifier(addr)` | owner (deployer) | cambia el verificador |
 
 ## Solana (pago demostrativo) — implementado (etapas 8–9); sin probar contra devnet real
 
 Flujo previsto (etapas 7–9 del ROADMAP):
 
-1. El comprador presiona "Pagar" en una cuota; la web arma una transferencia **USDC devnet** (SPL token) desde la wallet del comprador (Phantom) hacia la ATA de `sellerSolanaAddress`, con una instrucción **Memo** `cuotas:<obligationId>:<number>`.
+1. El comprador presiona "Pagar" en una cuota; la web arma una transferencia **USDC devnet** (SPL token) desde la wallet del comprador (Phantom) hacia la ATA de la `creditorSolanaAddress` **de ese pagaré** (la del acreedor actual; la del proveedor original si no se cedió), con una instrucción **Memo** `cuotas:<obligationId>:<number>`.
 2. La web envía la firma de la tx a un API route del servidor (`/api/payments/confirm`).
-3. El servidor (el **verifier**) consulta la tx en Solana devnet y verifica: confirmada, mint = USDC devnet, destino = ATA del vendedor, monto ≥ `amount` de la cuota, memo coincide.
+3. El servidor (el **verifier**) consulta la tx en Solana devnet y verifica: confirmada, mint = USDC devnet, destino = ATA del acreedor ACTUAL de ese pagaré (leído del contrato), monto ≥ `amount` de la cuota, memo coincide.
 4. Si es válida, el servidor firma `markInstallmentPaid(obligationId, number, signature)` en Monad con la clave del verifier (`VERIFIER_PRIVATE_KEY`, solo server-side).
 
 ## Redes

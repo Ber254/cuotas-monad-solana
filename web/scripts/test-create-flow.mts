@@ -13,7 +13,7 @@ const PYME = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"; // anvil 1
 const SOL = "11111111111111111111111111111111";
 const NOW = Math.floor(Date.parse("2026-10-03T00:00:00Z") / 1000);
 const base: ObligationFormValues = {
-  description: "Capital de trabajo PYME", buyer: PYME, sellerSolanaAddress: SOL,
+  description: "Compra de mercadería a crédito", buyer: PYME, sellerSolanaAddress: SOL,
   totalUsdc: "10000", installmentCount: "10", firstDueDate: "2026-11-02", intervalDays: "30",
 };
 const bad = (o: Partial<ObligationFormValues>, acc: string | undefined = ALICE) => {

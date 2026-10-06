@@ -1,5 +1,5 @@
 import { formatUnits } from "viem";
-import { USDC_DECIMALS } from "./registry";
+import { USDC_DECIMALS } from "./constants";
 
 /** Monto en unidades mínimas USDC (6 decimales) → "1.000" (es-AR). */
 export function formatUsdc(amount: bigint): string {

@@ -10,6 +10,9 @@ La web firma `markInstallmentPaid` con `VERIFIER_PRIVATE_KEY`. Hoy el `verifier`
 4. Comprobar: `npm run real:preflight` debe mostrar `✓ VERIFIER_PRIVATE_KEY corresponde al verifier del contrato` y **no** el aviso de "clave del OWNER".
 (Alternativa por línea de comandos: `cast send <contrato> "setVerifier(address)" <nueva> --private-key $OWNER_PK`, pero obliga a exponer la clave del owner; evitarla.) Ver D13/D21.
 
+## 0b. Desplegar/redesplegar el contrato (sin exportar claves)
+Si cambia el contrato (p. ej. la cesión de pagarés, D22): `./scripts/export-abi.sh` regenera `web/src/lib/abi.ts` y `bytecode.ts`; después, con `NEXT_PUBLIC_ENABLE_OWNER_TOOLS=1 npm run dev` y las variables de Testnet, abrir `http://localhost:3000/admin/deploy`, conectar la wallet **owner** (quien despliega queda como owner), pegar la dirección del verifier dedicado y firmar en MetaMask. La pantalla muestra la dirección nueva, su owner y su verifier. Actualizar `NEXT_PUBLIC_REGISTRY_ADDRESS` en todos lados y reconstruir (las `NEXT_PUBLIC_*` se fijan en build). Alternativa CLI: `forge script script/Deploy.s.sol` (expone la clave del deployer; evitar).
+
 ## 1. Vercel
 1. Importar el repo `Ber254/cuotas-monad-solana`. **Root Directory = `web`**. Framework: Next.js (autodetectado). Build/Install por defecto (`npm ci` / `next build`). Node 20 o 22.
 2. Variables de entorno (Production):

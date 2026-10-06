@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MarkPaidButton } from "@/components/MarkPaidButton";
-import { PayWithSolanaButton } from "@/components/PayWithSolanaButton";
+import { InstallmentsTable } from "@/components/InstallmentsTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatUsdc } from "@/lib/format";
-import { explorerTxUrl, isSolanaSignature } from "@/lib/solana";
 import { chain, explorerUrl, registryAddress } from "@/lib/monad";
 import { findObligationWithInstallments } from "@/lib/registry";
 
@@ -77,11 +75,11 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
             <dd className="font-mono break-all" data-testid="debtor">{o.buyer}</dd>
           </div>
           <div>
-            <dt className="text-white/60">Acreedor / inversor — cobra las cuotas</dt>
+            <dt className="text-white/60">Proveedor (acreedor original) — vendió y cobra</dt>
             <dd className="font-mono break-all" data-testid="creditor">{o.seller}</dd>
           </div>
           <div>
-            <dt className="text-white/60">Cuenta de cobro en Solana (USDC)</dt>
+            <dt className="text-white/60">Cuenta de cobro original en Solana (USDC)</dt>
             <dd className="font-mono break-all">{o.sellerSolanaAddress}</dd>
           </div>
         </dl>
@@ -126,63 +124,21 @@ export default async function ObligationPage({ params }: { params: Promise<{ id:
         </dl>
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">Cuotas</h2>
-        <div className="overflow-x-auto">
-        <table className="w-full min-w-[40rem] text-sm">
-          <thead className="text-left text-white/60">
-            <tr className="border-b border-white/15">
-              <th className="py-2 pr-3">N°</th>
-              <th>Monto (USDC)</th>
-              <th>Vencimiento</th>
-              <th>Estado (Monad)</th>
-              <th>Pagada el</th>
-              <th>Pago (Solana)</th>
-              <th>Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {installments.map((i) => (
-              <tr key={i.number} className="border-b border-white/5" data-testid="installment-row">
-                <td className="py-2 pr-3">{i.number}</td>
-                <td>{formatUsdc(i.amount)}</td>
-                <td>{formatDate(i.dueDate)}</td>
-                <td>
-                  <StatusBadge status={i.status} testId="installment-status" />
-                </td>
-                <td>{i.paidAt > BigInt(0) ? formatDate(i.paidAt) : "—"}</td>
-                <td className="font-mono break-all" data-testid="payment-ref" title={i.paymentRef}>
-                  {isSolanaSignature(i.paymentRef) ? (
-                    <a className="underline" href={explorerTxUrl(i.paymentRef)} target="_blank" data-testid="payment-ref-link">
-                      {i.paymentRef.slice(0, 12)}…
-                    </a>
-                  ) : (
-                    i.paymentRef || "—"
-                  )}
-                </td>
-                <td>
-                  {i.status !== "PAID" && (
-                    <div className="space-y-2">
-                      <PayWithSolanaButton
-                        obligationId={o.id.toString()}
-                        number={i.number}
-                        amount={i.amount.toString()}
-                        sellerSolanaAddress={o.sellerSolanaAddress}
-                      />
-                      <MarkPaidButton obligationId={o.id.toString()} number={i.number} seller={o.seller} />
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-        <p className="text-xs text-white/50">
-          OVERDUE se calcula al leer (impaga y vencida); no se guarda on-chain. El pago con USDC en Solana
-          se envía con Phantom (devnet) y el servidor verifica la tx (mint, destino, monto, memo) antes de marcar la cuota PAID en Monad. La confirmación manual del acreedor sigue disponible como respaldo.
-        </p>
-      </section>
+      <InstallmentsTable
+        obligationId={o.id.toString()}
+        buyer={o.buyer}
+        seller={o.seller}
+        rows={installments.map((i) => ({
+          number: i.number,
+          amount: i.amount.toString(),
+          dueDate: i.dueDate.toString(),
+          status: i.status,
+          paidAt: i.paidAt.toString(),
+          paymentRef: i.paymentRef,
+          creditor: i.creditor,
+          creditorSolanaAddress: i.creditorSolanaAddress,
+        }))}
+      />
     </main>
   );
 }

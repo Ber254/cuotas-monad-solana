@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MyObligations } from "@/components/MyObligations";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatUsdc } from "@/lib/format";
 import { chain, registryAddress, rpcUrl } from "@/lib/monad";
@@ -31,8 +32,9 @@ export default async function Home() {
     <main className="mx-auto max-w-3xl p-4 sm:p-8 space-y-6">
       <h1 className="text-3xl font-bold">Finvia</h1>
       <p>
-        Financiamiento para PYMEs: cada obligación de pago se divide en cuotas registradas en <b>Monad</b>{" "}
-        (fuente de verdad verificable), y cada cuota se paga en <b>USDC sobre Solana</b> (riel de pago).
+        Financiamiento de proveedores para PYMEs: el proveedor vende a crédito y la PYME firma pagarés (cuotas)
+        registrados en <b>Monad</b> (fuente de verdad verificable). Cada pagaré se paga en <b>USDC sobre Solana</b> y
+        el proveedor puede <b>ceder</b> pagarés a un tercero.
       </p>
       <section className="rounded border border-white/15 p-4 text-sm space-y-1" data-testid="config">
         <div>Red: {chain.name} (chainId {chain.id})</div>
@@ -42,6 +44,8 @@ export default async function Home() {
           Obligaciones registradas: <span data-testid="obligation-count">{count}</span>
         </div>
       </section>
+
+      <MyObligations />
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">

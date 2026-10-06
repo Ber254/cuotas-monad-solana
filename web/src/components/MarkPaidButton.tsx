@@ -7,16 +7,16 @@ import { ACCOUNT_EVENT, connectWallet, errorMessage, getConnectedAccount, sendMa
 
 /**
  * Confirmación manual del acreedor (D6). Solo se ofrece la acción si la wallet conectada es el
- * `seller` de la obligación; el contrato igual lo hace cumplir (`NotAuthorized`).
+ * acreedor ACTUAL de ese pagaré (puede haber sido cedido); el contrato igual lo hace cumplir (`NotAuthorized`).
  */
 export function MarkPaidButton({
   obligationId,
   number,
-  seller,
+  creditor,
 }: {
   obligationId: string;
   number: number;
-  seller: Address;
+  creditor: Address;
 }) {
   const router = useRouter();
   const [account, setAccount] = useState<Address>();
@@ -73,7 +73,7 @@ export function MarkPaidButton({
       </div>
     );
   }
-  if (account.toLowerCase() !== seller.toLowerCase()) {
+  if (account.toLowerCase() !== creditor.toLowerCase()) {
     return <span className="text-xs text-white/40">Solo el acreedor</span>;
   }
   if (!open) {

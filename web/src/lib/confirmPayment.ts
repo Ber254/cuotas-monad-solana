@@ -6,8 +6,8 @@ export type ConfirmInput = Partial<Record<"obligationId" | "number" | "signature
 export type ConfirmDeps = {
   /** Lee obligación y cuotas de Monad; `null` si no existe. */
   readObligation: (id: bigint) => Promise<{
-    sellerSolanaAddress: string;
-    installments: { number: number; amount: bigint; status: string }[];
+    /** `creditorSolanaAddress`: cuenta Solana del acreedor ACTUAL de ese pagaré (cambia si fue cedido). */
+    installments: { number: number; amount: bigint; status: string; creditorSolanaAddress: string }[];
   } | null>;
   fetchSolanaTx: (signature: string) => Promise<ParsedTransactionWithMeta | null>;
   /** Envía `markInstallmentPaid` como verifier. Debe lanzar un Error con `.name` = error del contrato. */
@@ -40,7 +40,7 @@ export async function confirmPayment(input: ConfirmInput, deps: ConfirmDeps): Pr
 
   const result = verifyPaymentTx(tx, {
     mint: deps.usdcMint,
-    sellerSolanaAddress: data.sellerSolanaAddress,
+    sellerSolanaAddress: inst.creditorSolanaAddress,
     amount: inst.amount,
     obligationId: id,
     number: num,

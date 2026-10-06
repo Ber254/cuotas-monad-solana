@@ -13,9 +13,10 @@ Etapas chicas e independientes. ✅ = terminada **y probada**; 🟡 = parcial; �
 | 7 | Pago manual de cuota (acreedor marca PAID desde la UI) | ✅ | E2E Chromium (`web/scripts/e2e-mark-paid.mjs`): la PYME no ve el botón, el acreedor marca PAID con `paymentRef`, ref repetida → error legible, 2/2 → COMPLETED. MetaMask real no probado |
 | 8 | Integración Solana: pagar con USDC devnet + memo (Phantom) | 🟡 | Tx verificada offline y en E2E con Phantom simulado. **Falta una tx real en devnet** (bloqueada en el entorno de desarrollo) |
 | 9 | Confirmación automática: `/api/payments/confirm` | 🟡 | Probado: verificador real vs contrato en anvil (`test:onchain`) + endpoint HTTP real + E2E, con RPC Solana simulado. **Falta contra Solana real** |
-| 10 | Demo end-to-end (PYME, 10 cuotas, todas pagadas → COMPLETED) | 🟡 | Local ✅: E2E paga las 10 cuotas por Solana (simulada) → COMPLETED, con capturas y guion `DEMO.md`. **Falta la corrida con redes y wallets reales** |
-| 11 | Testing (unit del verificador Solana, e2e) | ✅ | `./scripts/run-local-e2e.sh`: forge 10/10, `test:create`, `test:solana`, `test:verify`, `test:onchain`, E2E 19/19 |
+| 10 | Demo end-to-end (proveedor, PYME, 10 pagarés, todas pagadas → COMPLETED) | 🟡 | Local ✅: E2E paga las 10 cuotas por Solana (simulada) → COMPLETED, con capturas y guion `DEMO.md`. **Falta la corrida con redes y wallets reales** |
+| 11 | Testing (unit del verificador Solana, e2e) | ✅ | `./scripts/run-local-e2e.sh`: forge 10/10, `test:create`, `test:solana`, `test:verify`, `test:onchain`, E2E 28/28 (+ forge 16/16) |
 | 12 | Deploy (Monad Testnet + Vercel para `web/`) | 🟡 | Contrato en Monad Testnet ✅ (Devin). Web **preparada y verificada en local** con la config de Testnet (build, `check:deploy` anti-fuga, `/api/health`, degradación sin RPC) + guía `DEPLOY.md`. **No desplegada en Vercel** (sin acceso) |
+| 13 | Cesión de pagarés (el proveedor cede cuotas a un tercero) | 🟡 | Contrato + 16 tests forge, UI (acreedor por pagaré, panel de cesión, "Mis pagarés"), verificador contra el acreedor actual, `/admin/deploy`; E2E 28/28 (pago al nuevo acreedor ✓, pago a la cuenta anterior rechazado ✓; mutación comprobada). **Falta redesplegar en Monad Testnet y probar con wallets reales** |
 
 Notas:
 - Las etapas 5–7 se pueden hacer contra anvil local sin Monad Testnet.

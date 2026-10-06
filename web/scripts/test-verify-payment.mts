@@ -41,8 +41,8 @@ console.log("verifyPaymentTx: OK (1 válido + 9 inválidos rechazados)");
 let marked: unknown[] = [];
 const deps = (over: Partial<ConfirmDeps> = {}): ConfirmDeps => ({
   usdcMint: MINT,
-  readObligation: async (id) => id === BigInt(7) ? { sellerSolanaAddress: seller, installments: [
-    { number: 1, amount: AMOUNT, status: "PAID" }, { number: 2, amount: AMOUNT, status: "PENDING" } ] } : null,
+  readObligation: async (id) => id === BigInt(7) ? { installments: [
+    { number: 1, amount: AMOUNT, status: "PAID", creditorSolanaAddress: seller }, { number: 2, amount: AMOUNT, status: "PENDING", creditorSolanaAddress: seller } ] } : null,
   fetchSolanaTx: async () => parsedPaymentTx(base),
   markPaid: async (...a) => { marked.push(a); return "0xhash"; },
   ...over,

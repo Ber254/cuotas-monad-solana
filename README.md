@@ -2,7 +2,7 @@
 
 MVP de hackathon: **infraestructura de financiamiento para PYMEs** que convierte obligaciones de pago en cuotas programables.
 
-Ejemplo: una PYME recibe USD 10.000 y los devuelve en 10 cuotas de 1.000 USDC. La obligación y sus cuotas se registran en **Monad**; cada cuota se paga en **USDC sobre Solana**; cuando el servidor verifica el pago la cuota pasa a `PAID`, y cuando todas están pagadas la obligación pasa a `COMPLETED`.
+Ejemplo: una PYME le compra mercadería por USD 10.000 a un proveedor, que le da crédito: la PYME firma 10 pagarés (promesas de pago) de 1.000 USDC. El proveedor puede ceder pagarés a un tercero. La obligación y sus cuotas se registran en **Monad**; cada cuota se paga en **USDC sobre Solana**; cuando el servidor verifica el pago la cuota pasa a `PAID`, y cuando todas están pagadas la obligación pasa a `COMPLETED`.
 
 ```
 crear obligación → generar cuotas → ver cuotas → "Pagar" → pago USDC en Solana

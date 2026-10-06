@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { ACCOUNTS, ANVIL, BASE, REGISTRY, advanceDays, closeBrowser, createObligation, launch, newPage, randomOffCurvePubkey, randomSolanaPubkey, summary, test, text } from "./lib.mjs";
+import { ACCOUNTS, ANVIL, BASE, REGISTRY, advanceDays, cast, usdcAtaOf, closeBrowser, createObligation, launch, newPage, randomOffCurvePubkey, randomSolanaPubkey, summary, test, text } from "./lib.mjs";
 
 const SHOTS = process.env.E2E_SHOTS_DIR ?? path.resolve(import.meta.dirname, "../../docs/progress/demo");
 fs.mkdirSync(SHOTS, { recursive: true });
@@ -206,6 +206,91 @@ await test("el acreedor rechaza la firma en la wallet → mensaje y se puede rei
   assert.equal(await page.isDisabled('[data-testid="mark-paid-confirm"]'), false);
 });
 
+// ───────────────────────── 4b. Cesión de pagarés ─────────────────────────
+console.log("\n[4b] Cesión de pagarés a un tercero");
+const CAROL_SOL = randomSolanaPubkey();
+const creditors = async (page) => (await page.locator('[data-testid="installment-creditor"]').all()).length && page.locator('[data-testid="installment-creditor"]').evaluateAll((els) => els.map((e) => e.getAttribute("title").toLowerCase()));
+await test("el proveedor cede pagarés; solo él puede; validaciones; el deudor no puede ser acreedor", async () => {
+  const id = createObligation({ description: "E2E cesión", solana: SELLER_SOL, count: 4, unit: 500_000_000 });
+  // deudor y terceros NO ven la opción de ceder
+  for (const account of [ACCOUNTS.pyme, ACCOUNTS.carol]) {
+    const other = await newPage({ evm: { account, startConnected: true } });
+    await goto(other, `/obligations/${id}`);
+    await other.waitForSelector("text=Solo el acreedor");
+    assert.equal(await other.locator('[data-testid="cede-select"]').count(), 0);
+    assert.equal(await other.locator('[data-testid="cede-panel"]').count(), 0);
+  }
+  const page = await newPage({ evm: { startConnected: true } });
+  await goto(page, `/obligations/${id}`);
+  await page.waitForSelector('[data-testid="cede-select"]');
+  assert.equal(await page.locator('[data-testid="cede-select"]').count(), 4);
+  assert.equal(await page.isDisabled('[data-testid="cede-submit"]'), true, "sin selección no se puede ceder");
+  await page.locator('[data-testid="cede-select"]').nth(2).check();
+  await page.locator('[data-testid="cede-select"]').nth(3).check();
+  // validaciones
+  await page.fill("input[name=newCreditor]", ACCOUNTS.pyme);
+  assert.match(await text(page, '[data-testid="cede-problems"]'), /no puede ser el deudor/);
+  await page.fill("input[name=newCreditor]", ACCOUNTS.seller);
+  assert.match(await text(page, '[data-testid="cede-problems"]'), /no puede ser vos mismo/);
+  await page.fill("input[name=newCreditor]", ACCOUNTS.carol);
+  await page.fill("input[name=newCreditorSolana]", randomOffCurvePubkey());
+  assert.match(await text(page, '[data-testid="cede-problems"]'), /wallet válida/);
+  assert.equal(await page.isDisabled('[data-testid="cede-submit"]'), true);
+  await page.fill("input[name=newCreditorSolana]", CAROL_SOL);
+  await shot(page, "07-ceder-pagares.png");
+  await page.click('[data-testid="cede-submit"]');
+  await page.waitForSelector('[data-testid="cede-done"]');
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="ceded-badge"]').length === 2);
+  const c = await creditors(page);
+  assert.deepEqual(c, [ACCOUNTS.seller, ACCOUNTS.seller, ACCOUNTS.carol, ACCOUNTS.carol].map((a) => a.toLowerCase()));
+  // el proveedor original ya no puede cobrar manualmente las cedidas: solo ve acciones en 1 y 2
+  assert.equal(await page.locator('[data-testid="mark-paid"]').count(), 2);
+  assert.equal(await page.locator('[data-testid="cede-select"]').count(), 2);
+  await shot(page, "08-pagares-cedidos.png");
+  // on-chain: el contrato lo confirma
+  assert.match(cast("call", REGISTRY, "getObligationsByCreditor(address)(uint256[])", ACCOUNTS.carol, "--rpc-url", ANVIL), new RegExp(`\\b${id}\\b`));
+});
+await test("el nuevo acreedor ve sus pagarés, los cobra manualmente y 'Mis pagarés' muestra cada rol", async () => {
+  const id = createObligation({ description: "E2E cesión 2", solana: SELLER_SOL, count: 3 });
+  cast("send", REGISTRY, "transferInstallments(uint256,uint8[],address,string)", id, "[2,3]", ACCOUNTS.carol, CAROL_SOL, "--private-key", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", "--rpc-url", ANVIL);
+  const carol = await newPage({ evm: { account: ACCOUNTS.carol, startConnected: true } });
+  await goto(carol, `/obligations/${id}`);
+  await carol.waitForSelector('[data-testid="cede-select"]');
+  assert.equal(await carol.locator('[data-testid="cede-select"]').count(), 2, "Carol puede ceder 2 y 3");
+  assert.equal(await carol.locator('[data-testid="mark-paid"]').count(), 2);
+  await carol.locator('[data-testid="mark-paid"]').first().click();
+  await carol.fill('[data-testid="mark-paid-ref"]', `manual-carol-${id}-2`);
+  await carol.click('[data-testid="mark-paid-confirm"]');
+  await carol.waitForFunction(() => document.querySelectorAll('[data-testid="installment-status"]')[1]?.textContent.trim() === "PAID");
+  // Mis pagarés (home) por rol
+  const roleOf = async (account) => {
+    const p = await newPage({ evm: { account, startConnected: true } });
+    await goto(p, "/");
+    await p.waitForSelector('[data-testid="my-obligation-link"]');
+    return p.locator(`[data-testid="my-obligation-link"]:has-text("Obligación #${id}")`).locator('[data-testid="my-role"]').allInnerTexts();
+  };
+  assert.ok((await roleOf(ACCOUNTS.carol)).includes("Acreedor por cesión"));
+  assert.ok((await roleOf(ACCOUNTS.seller)).includes("Proveedor (creaste)"));
+  assert.ok((await roleOf(ACCOUNTS.pyme)).includes("Deudor (pagás vos)"));
+});
+await test("el deudor paga un pagaré cedido: va a la cuenta del NUEVO acreedor; pagar a la del anterior se rechaza", async () => {
+  const id = createObligation({ description: "E2E cesión pago", solana: SELLER_SOL, count: 3 });
+  cast("send", REGISTRY, "transferInstallments(uint256,uint8[],address,string)", id, "[2,3]", ACCOUNTS.carol, CAROL_SOL, "--private-key", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", "--rpc-url", ANVIL);
+  // 1) pago correcto del pagaré 2: el cliente arma la tx hacia la ATA de Carol y el servidor la valida contra el contrato
+  const ok = await newPage({ phantom: true });
+  await goto(ok, `/obligations/${id}`);
+  await ok.locator('[data-testid="pay-solana"]').nth(1).click(); // fila del pagaré 2
+  await ok.waitForFunction(() => document.querySelectorAll('[data-testid="installment-status"]')[1]?.textContent.trim() === "PAID", null, { timeout: 30000 });
+  // 2) pago del pagaré 3 mandado a la cuenta del acreedor ANTERIOR (p. ej. se pagó justo antes de la cesión): rechazado, no se marca PAID
+  const stale = await newPage({ phantom: { destinationOverride: usdcAtaOf(SELLER_SOL) } });
+  await goto(stale, `/obligations/${id}`);
+  await stale.locator('[data-testid="pay-solana"]').nth(1).click(); // ahora la 2ª fila impaga es el pagaré 3
+  await stale.waitForSelector('[data-testid="confirm-error"]', { timeout: 30000 });
+  assert.match(await text(stale, '[data-testid="confirm-error"]'), /destino|transferencia/i);
+  await goto(stale, `/obligations/${id}`);
+  assert.deepEqual(await statuses(stale), ["PENDING", "PAID", "PENDING"]);
+});
+
 // ───────────────────────── 5. Pago Solana: casos de error ─────────────────────────
 console.log("\n[5] Pago con Solana: errores y manipulaciones");
 const solErr = async (page, label = "") => {
@@ -355,6 +440,27 @@ await test("/admin/verifier: el owner cambia el verifier firmando con su wallet;
   await page.click('[data-testid="set-verifier"]');
   await page.waitForFunction((a) => document.querySelector('[data-testid="verifier"]')?.textContent.toLowerCase() === a.toLowerCase(), ACCOUNTS.seller);
   assert.equal(verifierOnChain().toLowerCase(), ACCOUNTS.seller.toLowerCase());
+});
+
+await test("/admin/deploy: despliega el contrato firmando con la wallet; el owner es quien firma", async () => {
+  const page = await newPage({ evm: {} });
+  await goto(page, "/admin/deploy");
+  await page.click('[data-testid="connect"]');
+  await page.waitForSelector('[data-testid="connected"]');
+  assert.equal(await page.isDisabled('[data-testid="deploy"]'), true);
+  await page.fill("input[name=verifier]", "0x123");
+  await page.waitForSelector('[data-testid="invalid"]');
+  await page.fill("input[name=verifier]", ACCOUNTS.seller);
+  await page.waitForSelector('[data-testid="same-as-owner"]');
+  await page.fill("input[name=verifier]", ACCT2);
+  await page.click('[data-testid="deploy"]');
+  await page.waitForSelector('[data-testid="deployed-address"]', { timeout: 30000 });
+  const addr = await text(page, '[data-testid="deployed-address"]');
+  const call = (fn) => cast("call", addr, fn, "--rpc-url", ANVIL).toLowerCase();
+  assert.equal(call("owner()(address)"), ACCOUNTS.seller.toLowerCase());
+  assert.equal(call("verifier()(address)"), ACCT2.toLowerCase());
+  assert.match(call("obligationCount()(uint256)"), /^0/);
+  cast("call", addr, "getObligationsByCreditor(address)(uint256[])", ACCOUNTS.carol, "--rpc-url", ANVIL); // incluye la cesión
 });
 
 // ───────────────────────── 6. OVERDUE (viaje en el tiempo, va al final) ─────────────────────────

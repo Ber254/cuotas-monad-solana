@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { getInstallments, getObligation } from "../src/lib/registry";
+import { getInstallments } from "../src/lib/registry";
 import { DEFAULT_USDC_DEVNET_MINT, buildPaymentTransaction, explorerTxUrl } from "../src/lib/solana";
 
 const arg = (n: string) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : undefined; };
@@ -17,18 +17,18 @@ const mint = new PublicKey(process.env.SOLANA_USDC_MINT || process.env.NEXT_PUBL
 const payer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync(keypairPath, "utf8"))));
 const number = Number(numberStr);
 
-const [obligation, installments] = await Promise.all([getObligation(BigInt(obligationId)), getInstallments(BigInt(obligationId))]);
+const installments = await getInstallments(BigInt(obligationId));
 const inst = installments.find((i) => i.number === number);
 if (!inst) throw new Error("la cuota no existe");
 if (inst.status === "PAID") throw new Error("la cuota ya está pagada");
-console.log(`Pagador ${payer.publicKey.toBase58()} → acreedor ${obligation.sellerSolanaAddress}: ${inst.amount} unidades, cuota ${number} de la obligación #${obligationId}`);
+console.log(`Pagador ${payer.publicKey.toBase58()} → acreedor ${inst.creditorSolanaAddress}: ${inst.amount} unidades, cuota ${number} de la obligación #${obligationId}`);
 
 const from = getAssociatedTokenAddressSync(mint, payer.publicKey);
 const bal = await solana.getTokenAccountBalance(from).catch(() => null);
 if (!bal || BigInt(bal.value.amount) < inst.amount) throw new Error(`saldo USDC insuficiente en ${from.toBase58()} (${bal?.value.amount ?? "sin cuenta"})`);
 
 const { blockhash } = await solana.getLatestBlockhash("confirmed");
-const tx = buildPaymentTransaction({ payer: payer.publicKey, seller: new PublicKey(obligation.sellerSolanaAddress), mint, amount: inst.amount, obligationId, number }, blockhash);
+const tx = buildPaymentTransaction({ payer: payer.publicKey, seller: new PublicKey(inst.creditorSolanaAddress), mint, amount: inst.amount, obligationId, number }, blockhash);
 tx.sign(payer);
 const signature = await solana.sendRawTransaction(tx.serialize());
 console.log(`Enviada: ${signature}\n${explorerTxUrl(signature)}`);

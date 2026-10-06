@@ -23,8 +23,12 @@ export function createConfirmDeps(): ConfirmDeps {
       const data = await findObligationWithInstallments(id);
       if (!data) return null;
       return {
-        sellerSolanaAddress: data.obligation.sellerSolanaAddress,
-        installments: data.installments.map((i) => ({ number: i.number, amount: i.amount, status: i.status })),
+        installments: data.installments.map((i) => ({
+          number: i.number,
+          amount: i.amount,
+          status: i.status,
+          creditorSolanaAddress: i.creditorSolanaAddress,
+        })),
       };
     },
     fetchSolanaTx: (signature) =>

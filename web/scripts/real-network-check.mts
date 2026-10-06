@@ -12,7 +12,7 @@ import { formatEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { installmentRegistryAbi } from "../src/lib/abi";
 import { chain, publicClient, registryAddress, rpcUrl } from "../src/lib/monad";
-import { getInstallments, getObligation } from "../src/lib/registry";
+import { getInstallments } from "../src/lib/registry";
 import { DEFAULT_USDC_DEVNET_MINT } from "../src/lib/solana";
 import { verifyPaymentTx } from "../src/lib/verifyPayment";
 
@@ -71,10 +71,10 @@ async function preflight() {
 
 async function checkTx(signature: string, obligationId: string, number: number) {
   console.log(`Tx ${signature}\nObligación #${obligationId}, cuota ${number}\n`);
-  const [obligation, installments] = await Promise.all([getObligation(BigInt(obligationId)), getInstallments(BigInt(obligationId))]);
+  const installments = await getInstallments(BigInt(obligationId));
   const inst = installments.find((i) => i.number === number);
   if (!inst) { bad("la cuota no existe"); return; }
-  console.log(`Esperado: ${inst.amount} unidades de ${mint} → ATA de ${obligation.sellerSolanaAddress}, memo "cuotas:${obligationId}:${number}" (estado cuota: ${inst.status})\n`);
+  console.log(`Esperado: ${inst.amount} unidades de ${mint} → ATA de ${inst.creditorSolanaAddress} (acreedor actual: ${inst.creditor}), memo "cuotas:${obligationId}:${number}" (estado cuota: ${inst.status})\n`);
   const tx = await solana.getParsedTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
   if (!tx) { bad("Solana no devuelve la tx (¿firma de otra red, o aún no confirmada?)"); return; }
   console.log("Lo que devolvió Solana (instrucciones de nivel superior):");
@@ -82,7 +82,7 @@ async function checkTx(signature: string, obligationId: string, number: number) 
     if ("parsed" in ix) console.log(`    ${ix.program}: ${JSON.stringify(ix.parsed).slice(0, 260)}`);
     else console.log(`    (sin parsear) ${ix.programId.toBase58()}`);
   }
-  const r = verifyPaymentTx(tx, { mint, sellerSolanaAddress: obligation.sellerSolanaAddress, amount: inst.amount, obligationId, number });
+  const r = verifyPaymentTx(tx, { mint, sellerSolanaAddress: inst.creditorSolanaAddress, amount: inst.amount, obligationId, number });
   console.log();
   if (r.ok) ok(`el verificador del servidor ACEPTARÍA este pago (pagador ${r.payer})`);
   else bad(`el verificador RECHAZARÍA este pago: ${r.reason}  → comparar con lo de arriba y ajustar src/lib/verifyPayment.ts + scripts/fixtures-solana.mts`);

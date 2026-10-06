@@ -160,4 +160,126 @@ contract InstallmentRegistryTest is Test {
         registry.setVerifier(eve);
         assertEq(registry.verifier(), eve);
     }
+
+    // ───────────── cesión de pagarés ─────────────
+    address carol = makeAddr("carol"); // nuevo acreedor
+    string constant CAROL_SOL = "CarolSo1anaPubkey1111111111111111111111111";
+
+    function _nums(uint8 from, uint8 to) internal pure returns (uint8[] memory a) {
+        a = new uint8[](to - from + 1);
+        for (uint8 i = 0; i < a.length; i++) {
+            a[i] = from + i;
+        }
+    }
+
+    function test_transfer_changesCreditorOnlyForSelectedInstallments() public {
+        uint256 id = _createDemo();
+        vm.expectEmit(true, true, true, true);
+        emit InstallmentRegistry.InstallmentTransferred(id, 6, carol, alice, CAROL_SOL);
+        vm.prank(alice);
+        registry.transferInstallments(id, _nums(6, 10), carol, CAROL_SOL);
+
+        InstallmentRegistry.InstallmentView[] memory list = registry.getInstallments(id);
+        for (uint8 i = 0; i < 10; i++) {
+            bool ceded = list[i].number >= 6;
+            assertEq(list[i].creditor, ceded ? carol : alice);
+            assertEq(list[i].creditorSolanaAddress, ceded ? CAROL_SOL : PAY_TO);
+            assertEq(list[i].seller, alice, "el vendedor original no cambia");
+            assertEq(list[i].buyer, bob);
+        }
+        assertEq(registry.getObligationsByCreditor(carol).length, 1);
+        assertEq(registry.getObligationsByCreditor(carol)[0], id);
+    }
+
+    function test_transfer_onlyCurrentCreditorCanTransfer() public {
+        uint256 id = _createDemo();
+        address[3] memory nope = [bob, eve, verifier];
+        for (uint256 i = 0; i < nope.length; i++) {
+            vm.prank(nope[i]);
+            vm.expectRevert(InstallmentRegistry.NotAuthorized.selector);
+            registry.transferInstallments(id, _nums(1, 1), carol, CAROL_SOL);
+        }
+        // tras ceder, el vendedor original ya no puede volver a ceder ese pagaré
+        vm.prank(alice);
+        registry.transferInstallments(id, _nums(1, 1), carol, CAROL_SOL);
+        vm.prank(alice);
+        vm.expectRevert(InstallmentRegistry.NotAuthorized.selector);
+        registry.transferInstallments(id, _nums(1, 1), eve, "EveSol");
+        // pero Carol sí puede re-ceder
+        vm.prank(carol);
+        registry.transferInstallments(id, _nums(1, 1), eve, "EveSol");
+        assertEq(registry.getInstallment(id, 1).creditor, eve);
+        assertEq(registry.getInstallment(id, 1).creditorSolanaAddress, "EveSol");
+    }
+
+    function test_transfer_rejectsInvalidParamsAndPaid() public {
+        uint256 id = _createDemo();
+        vm.startPrank(alice);
+        vm.expectRevert(InstallmentRegistry.InvalidParams.selector);
+        registry.transferInstallments(id, new uint8[](0), carol, CAROL_SOL); // sin cuotas
+        vm.expectRevert(InstallmentRegistry.InvalidParams.selector);
+        registry.transferInstallments(id, _nums(1, 1), address(0), CAROL_SOL);
+        vm.expectRevert(InstallmentRegistry.InvalidParams.selector);
+        registry.transferInstallments(id, _nums(1, 1), bob, CAROL_SOL); // el deudor no puede ser acreedor
+        vm.expectRevert(InstallmentRegistry.InvalidParams.selector);
+        registry.transferInstallments(id, _nums(1, 1), carol, ""); // sin cuenta Solana
+        vm.expectRevert(InstallmentRegistry.InvalidParams.selector);
+        registry.transferInstallments(id, _nums(1, 1), alice, PAY_TO); // a sí mismo
+        vm.expectRevert(InstallmentRegistry.InstallmentNotFound.selector);
+        registry.transferInstallments(id, _nums(11, 11), carol, CAROL_SOL);
+        uint8[] memory zero = new uint8[](1);
+        vm.expectRevert(InstallmentRegistry.InstallmentNotFound.selector);
+        registry.transferInstallments(id, zero, carol, CAROL_SOL);
+        vm.expectRevert(InstallmentRegistry.ObligationNotFound.selector);
+        registry.transferInstallments(99, _nums(1, 1), carol, CAROL_SOL);
+        vm.stopPrank();
+
+        vm.prank(verifier);
+        registry.markInstallmentPaid(id, 2, "sig2");
+        vm.prank(alice);
+        vm.expectRevert(InstallmentRegistry.AlreadyPaid.selector);
+        registry.transferInstallments(id, _nums(2, 2), carol, CAROL_SOL); // una cuota pagada no se cede
+    }
+
+    function test_transfer_isAtomic_oneBadInstallmentRevertsAll() public {
+        uint256 id = _createDemo();
+        vm.prank(alice);
+        registry.transferInstallments(id, _nums(3, 3), carol, CAROL_SOL); // la 3 ya es de Carol
+        vm.prank(alice);
+        vm.expectRevert(InstallmentRegistry.NotAuthorized.selector);
+        registry.transferInstallments(id, _nums(1, 4), eve, "EveSol"); // 1,2 propias, 3 ajena
+        assertEq(registry.getInstallment(id, 1).creditor, alice, "no debe quedar cedida a medias");
+        assertEq(registry.getInstallment(id, 2).creditor, alice);
+    }
+
+    function test_markPaid_afterTransfer_onlyNewCreditorOrVerifier() public {
+        uint256 id = _createDemo();
+        vm.prank(alice);
+        registry.transferInstallments(id, _nums(5, 5), carol, CAROL_SOL);
+        vm.prank(alice); // el vendedor original ya no cobra la 5
+        vm.expectRevert(InstallmentRegistry.NotAuthorized.selector);
+        registry.markInstallmentPaid(id, 5, "manual-alice");
+        vm.prank(alice); // pero sí la 4, que sigue siendo suya
+        registry.markInstallmentPaid(id, 4, "manual-alice-4");
+        vm.prank(carol);
+        registry.markInstallmentPaid(id, 5, "manual-carol-5");
+        assertEq(uint8(registry.getInstallment(id, 5).status), uint8(InstallmentRegistry.InstallmentStatus.PAID));
+        vm.prank(carol); // y Carol no puede marcar una cuota que no es suya
+        vm.expectRevert(InstallmentRegistry.NotAuthorized.selector);
+        registry.markInstallmentPaid(id, 6, "manual-carol-6");
+        vm.prank(verifier); // el verifier sigue pudiendo con cualquiera
+        registry.markInstallmentPaid(id, 6, "sig6");
+    }
+
+    function test_transfer_doesNotBreakCompletion() public {
+        uint256 id = _createDemo();
+        vm.prank(alice);
+        registry.transferInstallments(id, _nums(1, 10), carol, CAROL_SOL);
+        vm.startPrank(verifier);
+        for (uint8 n = 1; n <= 10; n++) {
+            registry.markInstallmentPaid(id, n, _ref(n));
+        }
+        vm.stopPrank();
+        assertEq(uint8(registry.getObligation(id).status), uint8(InstallmentRegistry.ObligationStatus.COMPLETED));
+    }
 }

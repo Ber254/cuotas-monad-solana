@@ -24,7 +24,7 @@ export type ParsedObligation =
   | { ok: false; errors: string[] };
 
 /** ¿Pubkey válida y on-curve? Las ATA de owners fuera de curva (PDAs) no se pueden crear en el flujo de pago. */
-function isSolanaWallet(addr: string): boolean {
+export function isSolanaWallet(addr: string): boolean {
   try {
     return PublicKey.isOnCurve(new PublicKey(addr).toBytes());
   } catch {

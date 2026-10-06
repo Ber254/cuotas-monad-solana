@@ -138,6 +138,16 @@ export const installmentRegistryAbi = [
             "name": "seller",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "creditor",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "creditorSolanaAddress",
+            "type": "string",
+            "internalType": "string"
           }
         ]
       }
@@ -204,6 +214,16 @@ export const installmentRegistryAbi = [
             "name": "seller",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "creditor",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "creditorSolanaAddress",
+            "type": "string",
+            "internalType": "string"
           }
         ]
       }
@@ -312,6 +332,25 @@ export const installmentRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "getObligationsByCreditor",
+    "inputs": [
+      {
+        "name": "creditor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getObligationsBySeller",
     "inputs": [
       {
@@ -393,6 +432,34 @@ export const installmentRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "transferInstallments",
+    "inputs": [
+      {
+        "name": "obligationId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "numbers",
+        "type": "uint8[]",
+        "internalType": "uint8[]"
+      },
+      {
+        "name": "newCreditor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "newCreditorSolanaAddress",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "usedPaymentRefs",
     "inputs": [
       {
@@ -450,6 +517,43 @@ export const installmentRegistryAbi = [
         "type": "address",
         "indexed": false,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "InstallmentTransferred",
+    "inputs": [
+      {
+        "name": "obligationId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "number",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "toSolanaAddress",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
       }
     ],
     "anonymous": false

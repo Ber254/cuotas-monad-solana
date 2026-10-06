@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RPC="http://127.0.0.1:8545"
 # Cuentas públicas por defecto de anvil (solo para desarrollo local).
-SELLER_PK="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # cuenta 0 = acreedor/inversor (seller) y verifier
+SELLER_PK="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # cuenta 0 = proveedor/acreedor (seller) y verifier
 BUYER_ADDRESS="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"                      # cuenta 1 = PYME deudora (buyer)
 # Pubkey de ejemplo (on-curve, sin fondos): reemplazar por la wallet Phantom (devnet) del acreedor.
 SELLER_SOLANA_ADDRESS="${SELLER_SOLANA_ADDRESS:-b229HdsmZ5B1d4BkTZuFTcLUogLBrx8JnaghrbbHHF6}"

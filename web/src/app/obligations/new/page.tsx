@@ -21,7 +21,7 @@ export default function NewObligationPage() {
   const [busy, setBusy] = useState(false);
   const [txError, setTxError] = useState<string>();
   const [values, setValues] = useState<ObligationFormValues>({
-    description: "Capital de trabajo PYME",
+    description: "Compra de mercadería a crédito",
     buyer: "",
     sellerSolanaAddress: "",
     totalUsdc: "10000",
@@ -65,7 +65,7 @@ export default function NewObligationPage() {
       </Link>
       <h1 className="text-2xl font-bold">Nueva obligación</h1>
       <p className="text-sm text-white/60">
-        La firma la wallet del <b>acreedor/inversor</b> en {chain.name}; se registra la obligación y se generan
+        La firma la wallet del <b>proveedor</b> (acreedor) en {chain.name}; se registra la obligación y se generan
         todas las cuotas. El pago de cada cuota será en USDC sobre Solana.
       </p>
 
@@ -95,7 +95,7 @@ export default function NewObligationPage() {
           <input className={inputClass} value={values.buyer} onChange={set("buyer")} name="buyer" placeholder="0x…" />
         </label>
         <label className="block space-y-1 text-sm">
-          <span>Cuenta Solana del acreedor (recibe los USDC)</span>
+          <span>Cuenta Solana del proveedor (recibe los USDC)</span>
           <input
             className={inputClass}
             value={values.sellerSolanaAddress}

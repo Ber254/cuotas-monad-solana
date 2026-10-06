@@ -1,5 +1,6 @@
 import { BaseError, ContractFunctionRevertedError, createWalletClient, custom, parseEventLogs, toHex, type Address, type EIP1193Provider, type Hex } from "viem";
 import { installmentRegistryAbi } from "./abi";
+import { installmentRegistryBytecode } from "./bytecode";
 import type { CreateObligationArgs } from "./obligationForm";
 import { chain, publicClient, registryAddress, rpcUrl } from "./monad";
 
@@ -81,7 +82,7 @@ const CONTRACT_ERRORS: Record<string, string> = {
   PaymentRefAlreadyUsed: "Esa referencia de pago ya fue usada en otra cuota; ingresá una distinta.",
   InstallmentNotFound: "La cuota no existe.",
   ObligationNotFound: "La obligación no existe.",
-  InvalidParams: "Parámetros inválidos (¿referencia vacía?).",
+  InvalidParams: "Parámetros inválidos (el nuevo acreedor no puede ser el deudor, ni vos mismo, ni estar vacío).",
 };
 
 /** Mensaje corto y legible para errores de wallet/viem. */
@@ -129,4 +130,33 @@ export async function sendSetVerifier(account: Address, newVerifier: Address): P
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error("La transacción fue revertida.");
   return hash;
+}
+
+/** Cede pagarés (cuotas impagas) del acreedor actual a otra dirección. Devuelve el hash de la tx. */
+export async function sendTransferInstallments(
+  account: Address,
+  obligationId: bigint,
+  numbers: number[],
+  newCreditor: Address,
+  newCreditorSolanaAddress: string,
+): Promise<Hex> {
+  if (!registryAddress) throw new Error("NEXT_PUBLIC_REGISTRY_ADDRESS no está configurada");
+  await ensureChain();
+  const walletClient = createWalletClient({ account, chain, transport: custom(getProvider()) });
+  const request = { address: registryAddress, abi: installmentRegistryAbi, functionName: "transferInstallments", args: [obligationId, numbers, newCreditor, newCreditorSolanaAddress] } as const;
+  await publicClient.simulateContract({ ...request, account });
+  const hash = await walletClient.writeContract(request);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error("La transacción fue revertida.");
+  return hash;
+}
+
+/** Despliega un InstallmentRegistry nuevo (el que firma queda como owner). Devuelve la dirección del contrato. */
+export async function sendDeployRegistry(account: Address, initialVerifier: Address): Promise<Address> {
+  await ensureChain();
+  const walletClient = createWalletClient({ account, chain, transport: custom(getProvider()) });
+  const hash = await walletClient.deployContract({ abi: installmentRegistryAbi, bytecode: installmentRegistryBytecode, args: [initialVerifier] });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success" || !receipt.contractAddress) throw new Error("El despliegue falló o fue revertido.");
+  return receipt.contractAddress;
 }

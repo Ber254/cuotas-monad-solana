@@ -19,8 +19,9 @@ cd web && npm run build && \
 3. **Crear otra** (`/obligations/new`, wallet del acreedor = anvil 0): monto 3.000, 6 cuotas → vista previa de vencimientos → crear → redirige al detalle. *Monad:* tx `createObligation`.
 4. **Pagar cuota 1**: "Pagar con Solana" (Phantom) → transferencia USDC + memo `cuotas:1:1` → el servidor verifica (mint, destino, monto, memo) → la cuota pasa a PAID con la firma de Solana como referencia (link al explorer). *Solana:* el pago. *Monad:* `markInstallmentPaid` firmado por el verifier.
 5. Repetir hasta la 10: progreso 10/10, saldo 0, estado **COMPLETED**.
-6. **Respaldo manual**: con la wallet del acreedor, "Marcar pagada" con una referencia (si Solana fallara en vivo).
-7. **Vencida**: una cuota impaga pasada de fecha se muestra OVERDUE (derivado del tiempo); igual se puede pagar.
+6. **Ceder pagarés** (proveedor → tercero): en el detalle, con la wallet del proveedor aparecen casillas en cada pagaré impago; marcar los que se ceden (p. ej. 6 a 10), pegar la dirección EVM y la cuenta Solana del nuevo acreedor y "Ceder". Cada pagaré cedido muestra el badge "cedido" y su nuevo acreedor; desde ahí el deudor paga a la cuenta Solana del nuevo acreedor (el servidor verifica contra el acreedor *actual* leído de Monad), y solo el nuevo acreedor (o el verificador) puede marcarlo pagado. En la home, "Mis pagarés" muestra a cada wallet su rol (proveedor, deudor, acreedor por cesión). *Monad:* el cambio de acreedor es una tx `transferInstallments`. *Solana:* el pago va a la cuenta del acreedor vigente. (El precio de la cesión se acuerda fuera de la app.)
+7. **Respaldo manual**: con la wallet del acreedor, "Marcar pagada" con una referencia (si Solana fallara en vivo).
+8. **Vencida**: una cuota impaga pasada de fecha se muestra OVERDUE (derivado del tiempo); igual se puede pagar.
 
 Qué decir si preguntan "¿es seguro?": el contrato no custodia fondos; solo el verifier (o el acreedor) puede marcar PAID; una firma de Solana no se puede reutilizar (el contrato la rechaza); el pago debe coincidir en mint, destino, monto y memo. Límites conocidos: ver `STATUS.md` ("Sin probar / riesgos").
 

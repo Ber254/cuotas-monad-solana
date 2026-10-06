@@ -62,3 +62,18 @@ export async function findObligationWithInstallments(id: bigint) {
     throw e;
   }
 }
+
+export type MyRole = "proveedor" | "deudor" | "acreedor-cedido";
+
+/** Obligaciones donde `who` participa, con su rol (puede tener más de uno). Orden: más recientes primero. */
+export async function getMyObligations(who: Address): Promise<{ id: bigint; roles: MyRole[] }[]> {
+  const read = (functionName: "getObligationsBySeller" | "getObligationsByBuyer" | "getObligationsByCreditor") =>
+    publicClient.readContract({ address: requireAddress(), abi: installmentRegistryAbi, functionName, args: [who] });
+  const [seller, buyer, creditor] = await Promise.all([read("getObligationsBySeller"), read("getObligationsByBuyer"), read("getObligationsByCreditor")]);
+  const roles = new Map<bigint, MyRole[]>();
+  const add = (ids: readonly bigint[], role: MyRole) => ids.forEach((id) => roles.set(id, [...(roles.get(id) ?? []), role]));
+  add(seller, "proveedor");
+  add(buyer, "deudor");
+  add(creditor, "acreedor-cedido");
+  return [...roles.entries()].map(([id, r]) => ({ id, roles: r })).sort((a, b) => (a.id < b.id ? 1 : -1));
+}
