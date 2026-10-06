@@ -10,7 +10,7 @@ import { USDC_DECIMALS } from "./constants";
 export const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 
 /** USDC de devnet (Circle). Configurable con NEXT_PUBLIC_SOLANA_USDC_MINT. */
-export const DEFAULT_USDC_DEVNET_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZ6hZKqt";
+export const DEFAULT_USDC_DEVNET_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 
 export const solanaRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
 export const usdcMint = process.env.NEXT_PUBLIC_SOLANA_USDC_MINT || DEFAULT_USDC_DEVNET_MINT;

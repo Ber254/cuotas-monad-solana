@@ -40,9 +40,13 @@ Cómo funciona la simulación (importante para no confundirla con una prueba rea
 ## Herramientas para validar contra redes reales (listas, probadas solo en local)
 `npm run real:preflight` (conectividad, mint, contrato, verifier/saldo/clave), `npm run pay:devnet` (paga una cuota por CLI con keypair: bytes firmados reales → RPC → verificador) y `npm run real:tx` (diagnostica una tx real vs la obligación). Cubiertas en la batería: preflight con clave correcta/equivocada/RPC caído, `real:tx` con pago válido/memo incorrecto/firma inexistente, y `pay:devnet` de punta a punta contra el mock (que decodifica y verifica la firma de los bytes enviados). El verificador ignora instrucciones extra (compute budget, sin parsear) que Phantom pueda agregar (test).
 
+## Validación real en curso (2026-10-06, hecha por el usuario en Windows/PowerShell)
+- ✓ Solana devnet y Monad Testnet alcanzables desde su PC. ✓ `real:preflight`: contrato legible en Testnet (owner = verifier = `0x316A…25dc`, 0 obligaciones, verifier con ~4,8 MON). ✗ → corregido: el mint por defecto no existía (ver abajo).
+- Tip Windows: si Node/PowerShell se cuelgan al conectar (IPv6), `$env:NODE_OPTIONS="--dns-result-order=ipv4first"` en esa ventana; con `curl.exe` funciona sin eso. En PowerShell, pegar los comandos de a uno (o con `;`) y con las direcciones entre comillas.
+
 ## Sin probar / riesgos (honesto)
 - Nada contra **Solana devnet** ni **Monad Testnet**; nada con **MetaMask/Phantom** reales. El formato `jsonParsed` real podría diferir de las fixtures → el verificador rechazaría pagos válidos; probar primero eso.
-- Mint USDC devnet `4zMMC9sr…ZKqt` sin verificar on-chain (configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT` / `SOLANA_USDC_MINT`).
+- **Mint USDC devnet (corregido 2026-10-06):** la dirección que había puesto de memoria (`4zMMC9sr…ZKqt`) era **inventada en su final y no existe** en devnet (confirmado con `real:preflight`, con el RPC y con Solana Explorer). La correcta, copiada de la documentación de Circle por el usuario, es `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`; **falta confirmar con `npm run real:preflight`** que existe, es de SPL Token y tiene 6 decimales. Configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT` / `SOLANA_USDC_MINT`.
 - El endpoint de confirmación es público: rate limit en memoria (no sirve con varias instancias, p. ej. serverless) y sin autenticación; cualquiera con una firma válida puede disparar el registro (idempotente). La identidad Solana del pagador no se liga al `buyer` EVM (D19).
 - **Despliegue (etapa 12) no hecho.** Antes de desplegar leer `DEPLOY.md` § 0: la clave del verifier NO debe ser la wallet personal owner/deployer (D21). Las `NEXT_PUBLIC_*` se fijan en build.
 - Hallazgo propio al probar `check:deploy`: la primera versión daba ✓ sin comparar el secreto cuando la variable no estaba definida (falso OK). Corregido: avisa y revisa además las variables `NEXT_PUBLIC_*`.

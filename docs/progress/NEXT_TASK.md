@@ -6,7 +6,7 @@ Desplegar la web (Vercel) y hacer **la corrida real de punta a punta** con Solan
 
 ## Contexto
 - Etapas 1–11 hechas; la 12 está **preparada** (`DEPLOY.md`, `/api/health`, `check:deploy`) pero no desplegada. Etapas 8, 9 y 10 probadas solo con wallets y RPC de Solana simulados (D20).
-- Riesgos principales a validar primero: (a) el formato real de `getParsedTransaction(jsonParsed)` vs. las fixtures (`web/scripts/fixtures-solana.mts`): si el verificador devuelve 422 con una tx válida, ajustar `verifyPayment.ts`; (b) el mint USDC devnet `4zMMC9sr…ZKqt` sin verificar; (c) latencia: el endpoint puede superar 10 s (`maxDuration = 60`).
+- Riesgos principales a validar primero: (a) el formato real de `getParsedTransaction(jsonParsed)` vs. las fixtures (`web/scripts/fixtures-solana.mts`): si el verificador devuelve 422 con una tx válida, ajustar `verifyPayment.ts`; (b) el mint USDC devnet `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` (corregido el 2026-10-06; confirmar con `real:preflight`); (c) latencia: el endpoint puede superar 10 s (`maxDuration = 60`).
 - Seguridad: **no usar la clave personal del owner/deployer como verifier en Vercel** (D21, `DEPLOY.md` § 0): crear una wallet dedicada y llamar `setVerifier`.
 
 ## Desbloqueo (lo único que depende de una persona)
