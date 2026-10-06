@@ -29,6 +29,7 @@ if (secret) {
 }
 if (/VERIFIER_PRIVATE_KEY/.test(client)) problems.push("el nombre VERIFIER_PRIVATE_KEY aparece en un bundle del navegador");
 for (const name of ["SOLANA_RPC_URL", "SOLANA_USDC_MINT"]) if (new RegExp(`process\\.env\\.${name}\\b`).test(client)) problems.push(`${name} (solo servidor) se lee en código del navegador`);
+if (process.env.NEXT_PUBLIC_ENABLE_OWNER_TOOLS === "1") console.warn("⚠ NEXT_PUBLIC_ENABLE_OWNER_TOOLS=1: este build incluye /admin/verifier. Usalo solo en local; NO en producción.");
 const reg = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS;
 if (reg && !client.includes(reg)) problems.push("NEXT_PUBLIC_REGISTRY_ADDRESS no quedó embebida (¿se cambió después de buildear?)");
 

@@ -75,6 +75,7 @@ export async function sendCreateObligation(account: Address, args: CreateObligat
 }
 
 const CONTRACT_ERRORS: Record<string, string> = {
+  NotOwner: "Solo el owner del contrato puede cambiar el verifier. Conectá la wallet owner.",
   NotAuthorized: "Solo el acreedor (o el verificador) puede marcar una cuota como pagada.",
   AlreadyPaid: "Esa cuota ya está pagada.",
   PaymentRefAlreadyUsed: "Esa referencia de pago ya fue usada en otra cuota; ingresá una distinta.",
@@ -110,6 +111,19 @@ export async function sendMarkInstallmentPaid(
   const walletClient = createWalletClient({ account, chain, transport: custom(getProvider()) });
   const request = { address: registryAddress, abi: installmentRegistryAbi, functionName: "markInstallmentPaid", args: [obligationId, number, paymentRef] } as const;
   // Simula primero para mostrar el motivo del revert (receipt fallido no lo trae).
+  await publicClient.simulateContract({ ...request, account });
+  const hash = await walletClient.writeContract(request);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error("La transacción fue revertida.");
+  return hash;
+}
+
+/** Cambia el `verifier` del contrato (solo el owner). Devuelve el hash de la tx. */
+export async function sendSetVerifier(account: Address, newVerifier: Address): Promise<Hex> {
+  if (!registryAddress) throw new Error("NEXT_PUBLIC_REGISTRY_ADDRESS no está configurada");
+  await ensureChain();
+  const walletClient = createWalletClient({ account, chain, transport: custom(getProvider()) });
+  const request = { address: registryAddress, abi: installmentRegistryAbi, functionName: "setVerifier", args: [newVerifier] } as const;
   await publicClient.simulateContract({ ...request, account });
   const hash = await walletClient.writeContract(request);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });

@@ -35,7 +35,7 @@ set -a; . ./.env.local; set +a
 
 echo "== build + chequeo de secretos del bundle"
 export VERIFIER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-npm run build >/dev/null 2>&1 || fail "build"
+NEXT_PUBLIC_ENABLE_OWNER_TOOLS=1 npm run build >/dev/null 2>&1 || fail "build"   # incluye /admin/verifier solo para probarlo
 npm run check:deploy || fail "check:deploy (fuga de secretos o contrato no embebido)"
 echo "== servidores"
 npx tsx scripts/mock-solana-rpc.mts > "$LOG/mock.log" 2>&1 & PIDS+=($!)

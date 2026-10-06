@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { ACCOUNTS, BASE, advanceDays, closeBrowser, createObligation, launch, newPage, randomOffCurvePubkey, randomSolanaPubkey, summary, test, text } from "./lib.mjs";
+import { ACCOUNTS, ANVIL, BASE, REGISTRY, advanceDays, closeBrowser, createObligation, launch, newPage, randomOffCurvePubkey, randomSolanaPubkey, summary, test, text } from "./lib.mjs";
 
 const SHOTS = process.env.E2E_SHOTS_DIR ?? path.resolve(import.meta.dirname, "../../docs/progress/demo");
 fs.mkdirSync(SHOTS, { recursive: true });
@@ -292,6 +292,56 @@ await test("CLI pay:devnet: bytes firmados reales → RPC → verificador → PA
   await goto(page, `/obligations/${id}`);
   assert.deepEqual(await statuses(page), ["PAID", "PENDING"]);
   assert.equal(await page.locator('[data-testid="payment-ref-link"]').count(), 1);
+});
+
+// ───────────────────────── 5b. Herramientas del owner ─────────────────────────
+console.log("\n[5b] Verifier dedicado: generador de wallet y pantalla del owner");
+const ACCT2 = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"; // anvil 2
+const verifierOnChain = () => execFileSync("cast", ["call", REGISTRY, "verifier()(address)", "--rpc-url", ANVIL], { encoding: "utf8" }).trim();
+await test("verifier:new genera la wallet SIN imprimir la clave, y no la sobrescribe", async () => {
+  const file = path.join(os.tmpdir(), `finvia-verifier-${process.pid}.key`);
+  fs.rmSync(file, { force: true });
+  const run = (...a) => execFileSync("npx", ["tsx", "scripts/new-verifier.mts", ...a], { encoding: "utf8", env: { ...process.env, VERIFIER_KEY_FILE: file } });
+  const out = run();
+  const key = fs.readFileSync(file, "utf8").trim();
+  assert.match(key, /^0x[0-9a-f]{64}$/);
+  assert.ok(!out.includes(key.slice(2)), "la clave NO debe imprimirse");
+  const addr = out.match(/0x[0-9a-fA-F]{40}/)[0];
+  const again = run();
+  assert.equal(fs.readFileSync(file, "utf8").trim(), key, "no sobrescribe");
+  assert.ok(again.includes(addr) && !again.includes(key.slice(2)));
+  fs.rmSync(file);
+});
+await test("/admin/verifier: el owner cambia el verifier firmando con su wallet; un no-owner es rechazado", async () => {
+  const notOwner = await newPage({ evm: { account: ACCOUNTS.pyme } });
+  await goto(notOwner, "/admin/verifier");
+  await notOwner.click('[data-testid="connect"]');
+  await notOwner.waitForSelector('[data-testid="connected"]:has-text("NO es el owner")');
+  await notOwner.fill("input[name=newVerifier]", ACCT2);
+  await notOwner.click('[data-testid="set-verifier"]');
+  await notOwner.waitForSelector('[data-testid="owner-error"]');
+  assert.match(await text(notOwner, '[data-testid="owner-error"]'), /Solo el owner/);
+  assert.equal(verifierOnChain().toLowerCase(), ACCOUNTS.seller.toLowerCase(), "el verifier no debe cambiar");
+
+  const page = await newPage({ evm: {} });
+  await goto(page, "/admin/verifier");
+  assert.equal((await text(page, '[data-testid="owner"]')).toLowerCase(), ACCOUNTS.seller.toLowerCase());
+  await page.click('[data-testid="connect"]');
+  await page.waitForSelector('[data-testid="connected"]:has-text("owner ✓")');
+  await page.fill("input[name=newVerifier]", "0x123");
+  assert.equal(await page.isDisabled('[data-testid="set-verifier"]'), true, "dirección inválida");
+  await page.fill("input[name=newVerifier]", ACCOUNTS.seller);
+  await page.waitForSelector('[data-testid="same-as-owner"]');
+  await page.fill("input[name=newVerifier]", ACCT2);
+  await page.click('[data-testid="set-verifier"]');
+  await page.waitForSelector('[data-testid="owner-done"]');
+  assert.equal(verifierOnChain().toLowerCase(), ACCT2.toLowerCase());
+  assert.equal((await text(page, '[data-testid="verifier"]')).toLowerCase(), ACCT2.toLowerCase());
+  // restaurar para no romper el resto de la batería (el servidor firma con la cuenta 0)
+  await page.fill("input[name=newVerifier]", ACCOUNTS.seller);
+  await page.click('[data-testid="set-verifier"]');
+  await page.waitForFunction((a) => document.querySelector('[data-testid="verifier"]')?.textContent.toLowerCase() === a.toLowerCase(), ACCOUNTS.seller);
+  assert.equal(verifierOnChain().toLowerCase(), ACCOUNTS.seller.toLowerCase());
 });
 
 // ───────────────────────── 6. OVERDUE (viaje en el tiempo, va al final) ─────────────────────────

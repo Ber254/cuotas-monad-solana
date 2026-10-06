@@ -44,6 +44,8 @@ Cómo funciona la simulación (importante para no confundirla con una prueba rea
 - ✓ Solana devnet y Monad Testnet alcanzables desde su PC. ✓ `real:preflight`: contrato legible en Testnet (owner = verifier = `0x316A…25dc`, 0 obligaciones, verifier con ~4,8 MON). ✗ → corregido: el mint por defecto no existía (ver abajo).
 - Tip Windows: si Node/PowerShell se cuelgan al conectar (IPv6), `$env:NODE_OPTIONS="--dns-result-order=ipv4first"` en esa ventana; con `curl.exe` funciona sin eso. En PowerShell, pegar los comandos de a uno (o con `;`) y con las direcciones entre comillas.
 
+- ✓ `real:preflight` contra redes reales: mint `4zMMC9sr…ncDU` verificado (SPL Token, 6 decimales). Pendiente: verifier dedicado (herramientas `verifier:new` y `/admin/verifier`, probadas en local), pago real de una cuota.
+
 ## Sin probar / riesgos (honesto)
 - Nada contra **Solana devnet** ni **Monad Testnet**; nada con **MetaMask/Phantom** reales. El formato `jsonParsed` real podría diferir de las fixtures → el verificador rechazaría pagos válidos; probar primero eso.
 - **Mint USDC devnet (corregido 2026-10-06):** la dirección que había puesto de memoria (`4zMMC9sr…ZKqt`) era **inventada en su final y no existe** en devnet (confirmado con `real:preflight`, con el RPC y con Solana Explorer). La correcta, copiada de la documentación de Circle por el usuario, es `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`; **falta confirmar con `npm run real:preflight`** que existe, es de SPL Token y tiene 6 decimales. Configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT` / `SOLANA_USDC_MINT`.

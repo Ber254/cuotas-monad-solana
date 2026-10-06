@@ -2,16 +2,13 @@
 
 Estado: **preparado y verificado en local, NO desplegado** (no hay acceso a Vercel ni a Monad Testnet desde el entorno de desarrollo). El contrato ya está en Monad Testnet; falta publicar la web.
 
-## 0. Antes de desplegar: recomendación de seguridad (leer)
-La web firma `markInstallmentPaid` con `VERIFIER_PRIVATE_KEY`. Hoy el `verifier` del contrato es la wallet MetaMask personal de Bernardo (`0x316A…25dc`), que también es el `owner` (D13). **No pongas esa clave en Vercel**: quien la obtenga controla el contrato y la wallet. Usá una wallet dedicada (solo para esto, con MON de faucet) y delegá:
-```bash
-cast wallet new                                   # genera la wallet del verifier; guardá la clave como secreto
-cast send 0xF7a6e0f226ecDc708Af88679F2A9a557E918C321 "setVerifier(address)" <NUEVA_ADDR> \
-  --rpc-url https://testnet-rpc.monad.xyz --private-key $OWNER_PK     # lo firma el owner, una sola vez
-cast call 0xF7a6e0f226ecDc708Af88679F2A9a557E918C321 "verifier()(address)" --rpc-url https://testnet-rpc.monad.xyz
-# fondear la nueva wallet con MON (faucet de Monad Testnet) para pagar gas
-```
-No hace falta re-desplegar el contrato. (Ver D13/D21.) El `owner` nunca debería estar en el servidor.
+## 0. Antes de desplegar: verifier dedicado (sin exportar claves)
+La web firma `markInstallmentPaid` con `VERIFIER_PRIVATE_KEY`. Hoy el `verifier` del contrato es la wallet MetaMask personal de Bernardo (`0x316A…25dc`), que también es el `owner` (D13). **No pongas esa clave en Vercel ni en ningún servidor**: quien la obtenga controla el contrato y la wallet. Procedimiento (no hace falta re-desplegar el contrato ni mostrar ninguna clave):
+1. **Generar la wallet del verifier** (`cd web && npm run verifier:new`): imprime solo la dirección pública; la clave queda en `web/.verifier-key` (ignorado por git, nunca se muestra). Para usarla en una terminal PowerShell: `$env:VERIFIER_PRIVATE_KEY=(Get-Content .verifier-key)`.
+2. **Fondearla con gas** (MON de Monad Testnet): enviarle ~0,3 MON desde MetaMask a esa dirección.
+3. **Asignarla en el contrato** con la pantalla del owner, firmando con MetaMask (la wallet owner): arrancar `NEXT_PUBLIC_ENABLE_OWNER_TOOLS=1 npm run dev` con `NEXT_PUBLIC_CHAIN_ID=10143` y `NEXT_PUBLIC_REGISTRY_ADDRESS=0xF7a6…C321`, abrir `http://localhost:3000/admin/verifier`, conectar la wallet owner, pegar la dirección nueva y "Asignar verifier". Esa pantalla da 404 si el flag no está (y `check:deploy` advierte si un build lo incluye): **no habilitarla en producción**.
+4. Comprobar: `npm run real:preflight` debe mostrar `✓ VERIFIER_PRIVATE_KEY corresponde al verifier del contrato` y **no** el aviso de "clave del OWNER".
+(Alternativa por línea de comandos: `cast send <contrato> "setVerifier(address)" <nueva> --private-key $OWNER_PK`, pero obliga a exponer la clave del owner; evitarla.) Ver D13/D21.
 
 ## 1. Vercel
 1. Importar el repo `Ber254/cuotas-monad-solana`. **Root Directory = `web`**. Framework: Next.js (autodetectado). Build/Install por defecto (`npm ci` / `next build`). Node 20 o 22.
