@@ -16,7 +16,8 @@
     "real:preflight": "tsx scripts/real-network-check.mts preflight",
     "real:tx": "tsx scripts/real-network-check.mts tx",
     "pay:devnet": "tsx scripts/pay-devnet.mts",
-    "verifier:new": "tsx scripts/new-verifier.mts"
+    "verifier:new": "tsx scripts/new-verifier.mts",
+    "solana:new": "tsx scripts/new-solana-wallet.mts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

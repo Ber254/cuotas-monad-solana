@@ -46,6 +46,9 @@ Cómo funciona la simulación (importante para no confundirla con una prueba rea
 
 - ✓ `real:preflight` contra redes reales: mint `4zMMC9sr…ncDU` verificado (SPL Token, 6 decimales). Pendiente: verifier dedicado (herramientas `verifier:new` y `/admin/verifier`, probadas en local), pago real de una cuota.
 
+- ✓ **Verifier dedicado hecho en Monad Testnet (2026-10-06):** `verifier:new` + gas (0,3 MON enviado desde MetaMask) + `setVerifier` con `/admin/verifier` (tx `0x459f60abb80303ad6a6443253a9039104a59559924dfa33739ada66dddb6f5cb`). Contrato: owner `0x316A…25dc`, verifier `0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70`; `real:preflight` ✓ con `VERIFIER_PRIVATE_KEY` cargada desde `web/.verifier-key`. Nota: MetaMask muestra "Monad" (mainnet) y "Monad Testnet" por separado; la de prueba requiere "Mostrar redes de prueba".
+- Siguiente en curso: pagar una cuota real (wallet Solana generada con `npm run solana:new -- --out .solana-payer.json`, SOL devnet de faucet.solana.com y USDC devnet de faucet.circle.com, obligación creada en Testnet con MetaMask, `pay:devnet`).
+
 ## Sin probar / riesgos (honesto)
 - Nada contra **Solana devnet** ni **Monad Testnet**; nada con **MetaMask/Phantom** reales. El formato `jsonParsed` real podría diferir de las fixtures → el verificador rechazaría pagos válidos; probar primero eso.
 - **Mint USDC devnet (corregido 2026-10-06):** la dirección que había puesto de memoria (`4zMMC9sr…ZKqt`) era **inventada en su final y no existe** en devnet (confirmado con `real:preflight`, con el RPC y con Solana Explorer). La correcta, copiada de la documentación de Circle por el usuario, es `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`; **falta confirmar con `npm run real:preflight`** que existe, es de SPL Token y tiene 6 decimales. Configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT` / `SOLANA_USDC_MINT`.

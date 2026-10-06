@@ -312,6 +312,19 @@ await test("verifier:new genera la wallet SIN imprimir la clave, y no la sobresc
   assert.ok(again.includes(addr) && !again.includes(key.slice(2)));
   fs.rmSync(file);
 });
+await test("solana:new genera el keypair SIN imprimir la clave, es usable por pay:devnet y no se sobrescribe", async () => {
+  const file = path.join(os.tmpdir(), `finvia-solana-${process.pid}.json`);
+  fs.rmSync(file, { force: true });
+  const run = () => execFileSync("npx", ["tsx", "scripts/new-solana-wallet.mts", "--out", file], { encoding: "utf8" });
+  const out = run();
+  const secret = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(secret.length, 64);
+  assert.ok(!out.includes(secret.join(",")) && !out.includes(JSON.stringify(secret)), "la clave NO debe imprimirse");
+  const pub = out.match(/Direcci[oó]n p[uú]blica[^:]*: ([1-9A-HJ-NP-Za-km-z]{32,44})/)[1];
+  assert.equal(run().includes(pub), true, "segunda corrida: misma dirección, sin sobrescribir");
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), secret);
+  fs.rmSync(file);
+});
 await test("/admin/verifier: el owner cambia el verifier firmando con su wallet; un no-owner es rechazado", async () => {
   const notOwner = await newPage({ evm: { account: ACCOUNTS.pyme } });
   await goto(notOwner, "/admin/verifier");

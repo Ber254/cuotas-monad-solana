@@ -34,6 +34,7 @@ npm run real:preflight                                   # conectividad, mint US
                                                          # y que VERIFIER_PRIVATE_KEY sea realmente el verifier (si no: NotAuthorized)
 npm run pay:devnet -- --keypair ~/.config/solana/id.json --obligation <id> --number <n> --confirm https://<app>
                                                          # paga una cuota por CLI (misma tx que la UI) y llama al verificador
+npm run solana:new -- --out .solana-payer.json           # wallet Solana pagadora (la clave no se imprime; fondearla con SOL y USDC devnet)
 npm run real:tx -- <firmaSolana> <obligationId> <cuota>  # contrasta una tx real con la obligación y muestra qué ve el verificador
 ```
 1. `npm run real:preflight` debe terminar en ✓. Confirmar a mano que el mint es el USDC de devnet de Circle; si no, cambiar `SOLANA_USDC_MINT` y `NEXT_PUBLIC_SOLANA_USDC_MINT`.

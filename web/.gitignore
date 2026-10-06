@@ -43,3 +43,5 @@ next-env.d.ts
 
 # clave privada del verifier generada por `npm run verifier:new` (NUNCA commitear)
 .verifier-key
+# keypairs de Solana generados por `npm run solana:new` (NUNCA commitear)
+.solana-*.json
