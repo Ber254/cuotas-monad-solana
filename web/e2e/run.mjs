@@ -47,6 +47,47 @@ await test("detalle explica dónde interviene Monad y Solana", async () => {
   assert.match(panel, /Monad — registro verificable/);
   assert.match(panel, /Solana — riel de pago/);
 });
+await test("idioma: navegador en inglés → sitio en inglés (fechas/números en-US); es-AR → español; el switch persiste", async () => {
+  const en = await newPage({ locale: "en-US" });
+  await goto(en, "/obligations/1");
+  assert.equal(await en.getAttribute("html", "lang"), "en");
+  const panel = await text(en, '[data-testid="chains-panel"]');
+  assert.match(panel, /Monad — verifiable record/);
+  assert.match(panel, /Solana — payment rail/);
+  assert.match(await en.locator("body").innerText(), /Total amount/);
+  assert.match(await text(en, '[data-testid="installment-row"] >> nth=0'), /\d{2}\/\d{2}\/\d{4}/);
+  await goto(en, "/");
+  assert.match(await en.locator("body").innerText(), /Supplier financing for SMEs/);
+  // switch manual → español, y se recuerda al recargar
+  await en.locator('[data-testid="lang-es"]').click();
+  await en.waitForFunction(() => document.documentElement.lang === "es");
+  await en.reload({ waitUntil: "networkidle" });
+  assert.match(await en.locator("body").innerText(), /Financiamiento de proveedores/);
+  assert.equal(await en.getAttribute("html", "lang"), "es");
+  const es = await newPage();
+  await goto(es, "/");
+  assert.equal(await es.getAttribute("html", "lang"), "es");
+  await es.locator('[data-testid="lang-en"]').click();
+  await es.waitForFunction(() => document.documentElement.lang === "en");
+  assert.match(await es.locator("body").innerText(), /\+ New obligation/);
+  noPageErrors(en);
+  noPageErrors(es);
+});
+await test("en inglés: validación del formulario, errores de wallet y API traducidos", async () => {
+  const page = await newPage({ locale: "en-US", evm: true });
+  await goto(page, "/obligations/new");
+  assert.match(await page.locator("body").innerText(), /New obligation/);
+  await page.fill("input[name=buyer]", "0x123");
+  assert.match(await text(page, '[data-testid="form-errors"]'), /not valid/);
+  const noWallet = await newPage({ locale: "en-US" });
+  await goto(noWallet, "/obligations/new");
+  await noWallet.locator('[data-testid="connect-wallet"]').click();
+  await noWallet.waitForSelector('[data-testid="tx-error"]');
+  assert.match(await text(noWallet, '[data-testid="tx-error"]'), /No EVM wallet detected/);
+  const post = (headers) => fetch(`${BASE}/api/payments/confirm`, { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": "10.8.8.8", ...headers }, body: JSON.stringify({ obligationId: "999999", number: 1, signature: "7".repeat(88) }) });
+  assert.match((await (await post({ "accept-language": "en" })).json()).error, /does not exist/);
+  assert.match((await (await post({})).json()).error, /no existe/);
+});
 await test("/api/health: configuración lista y contrato legible (sin exponer secretos)", async () => {
   const res = await fetch(`${BASE}/api/health`);
   const body = await res.json();

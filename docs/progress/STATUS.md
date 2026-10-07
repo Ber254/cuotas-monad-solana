@@ -18,6 +18,7 @@ Contrato `InstallmentRegistry` con 10 tests, scripts Foundry, `local-chain-setup
 | 9 | `POST /api/payments/confirm` (verificador), rate limit 30/min/IP, "Reintentar verificación" | `test:verify`, `test:onchain` (verificador real vs contrato), E2E (monto menor y memo ajeno rechazados con 422, reintento sin doble cobro, 400/404/409/429) | **`getParsedTransaction` real sin probar** (fixtures según documentación) |
 | 10 | Demo end-to-end ejecutable + guion (`DEMO.md`) + capturas (`docs/progress/demo/`) | E2E: 10 cuotas pagadas por Solana → COMPLETED | Simulada (ver arriba) |
 | 11 | Testing | batería completa `./scripts/run-local-e2e.sh` | — |
+| 13 | Sitio bilingüe ES/EN (D23): detección por navegador + switch, fechas/números localizados, errores y API traducidos | E2E 31/31 (incl. 2 tests en inglés) | admin queda en español; falta redeploy en Vercel (PR → main) |
 | 12 | Preparación de deploy: `/api/health`, `error.tsx`, timeouts RPC, `runtime/maxDuration`, `check:deploy` (anti-fuga de secretos), guía `DEPLOY.md` | build con config de Testnet; `check:deploy` limpio y con 4 fugas simuladas detectadas; health 503/200; degradación sin RPC (home 200 con error, detalle 500 + pantalla de error, confirm 502); batería completa | **No desplegado en Vercel**; Testnet inalcanzable desde aquí |
 
 ## Cómo se prueba todo (un comando)

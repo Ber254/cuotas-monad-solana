@@ -1,15 +1,24 @@
 import type { Metadata } from "next";
+import { LangProvider } from "@/components/LangProvider";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { getT } from "@/lib/lang.server";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Finvia — financiamiento PYME en cuotas",
-  description: "Obligaciones de pago de PYMEs en cuotas: registro en Monad, pago en USDC sobre Solana.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t("app.title"), description: t("app.description") };
+}
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { lang } = await getT();
   return (
-    <html lang="es">
-      <body className="antialiased">{children}</body>
+    <html lang={lang}>
+      <body className="antialiased">
+        <LangProvider lang={lang}>
+          <LanguageSwitch />
+          {children}
+        </LangProvider>
+      </body>
     </html>
   );
 }

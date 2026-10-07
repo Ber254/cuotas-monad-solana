@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { Address } from "viem";
+import { useT } from "@/components/LangProvider";
+import { rich } from "@/lib/rich";
 import { chain, registryAddress } from "@/lib/monad";
 import { formatDate, formatUsdc, shortAddress } from "@/lib/format";
 import { parseObligationForm, type ObligationFormValues } from "@/lib/obligationForm";
@@ -17,11 +19,12 @@ const inputClass = "w-full rounded border border-white/20 bg-white/5 px-3 py-2 t
 
 export default function NewObligationPage() {
   const router = useRouter();
+  const { lang, t } = useT();
   const [account, setAccount] = useState<Address>();
   const [busy, setBusy] = useState(false);
   const [txError, setTxError] = useState<string>();
   const [values, setValues] = useState<ObligationFormValues>({
-    description: "Compra de mercadería a crédito",
+    description: t("new.defaultDesc"),
     buyer: "",
     sellerSolanaAddress: "",
     totalUsdc: "10000",
@@ -33,14 +36,14 @@ export default function NewObligationPage() {
   const set = (k: keyof ObligationFormValues) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setValues((v) => ({ ...v, [k]: e.target.value }));
 
-  const parsed = useMemo(() => parseObligationForm(values, account, Math.floor(Date.now() / 1000)), [values, account]);
+  const parsed = useMemo(() => parseObligationForm(values, account, Math.floor(Date.now() / 1000), t), [values, account, t]);
 
   async function onConnect() {
     setTxError(undefined);
     try {
       setAccount(await connectWallet());
     } catch (e) {
-      setTxError(errorMessage(e));
+      setTxError(errorMessage(e, t));
     }
   }
 
@@ -53,7 +56,7 @@ export default function NewObligationPage() {
       const id = await sendCreateObligation(account, parsed.args);
       router.push(`/obligations/${id}`);
     } catch (err) {
-      setTxError(errorMessage(err));
+      setTxError(errorMessage(err, t));
       setBusy(false);
     }
   }
@@ -61,15 +64,14 @@ export default function NewObligationPage() {
   return (
     <main className="mx-auto max-w-3xl p-4 sm:p-8 space-y-6">
       <Link href="/" className="text-sm text-white/60 hover:underline">
-        ← Volver
+        {t("nav.back")}
       </Link>
-      <h1 className="text-2xl font-bold">Nueva obligación</h1>
+      <h1 className="text-2xl font-bold">{t("new.title")}</h1>
       <p className="text-sm text-white/60">
-        La firma la wallet del <b>proveedor</b> (acreedor) en {chain.name}; se registra la obligación y se generan
-        todas las cuotas. El pago de cada cuota será en USDC sobre Solana.
+        {rich(t("new.intro", { chain: chain.name }))}
       </p>
 
-      {!registryAddress && <p className="text-red-300">NEXT_PUBLIC_REGISTRY_ADDRESS no está configurada.</p>}
+      {!registryAddress && <p className="text-red-300">{t("new.noRegistry")}</p>}
 
       <div className="flex items-center gap-3 text-sm">
         <button
@@ -78,24 +80,24 @@ export default function NewObligationPage() {
           className="rounded bg-white/10 px-3 py-2 hover:bg-white/20"
           data-testid="connect-wallet"
         >
-          {account ? "Cambiar cuenta" : "Conectar wallet"}
+          {account ? t("common.changeAccount") : t("common.connectWallet")}
         </button>
         <span data-testid="account" className="font-mono">
-          {account ? `Acreedor: ${shortAddress(account)}` : "Wallet no conectada"}
+          {account ? t("new.creditor", { addr: shortAddress(account) }) : t("new.notConnected")}
         </span>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block space-y-1 text-sm">
-          <span>Descripción</span>
+          <span>{t("new.f.description")}</span>
           <input className={inputClass} value={values.description} onChange={set("description")} name="description" />
         </label>
         <label className="block space-y-1 text-sm">
-          <span>Dirección EVM de la PYME deudora (paga las cuotas)</span>
+          <span>{t("new.f.buyer")}</span>
           <input className={inputClass} value={values.buyer} onChange={set("buyer")} name="buyer" placeholder="0x…" />
         </label>
         <label className="block space-y-1 text-sm">
-          <span>Cuenta Solana del proveedor (recibe los USDC)</span>
+          <span>{t("new.f.solana")}</span>
           <input
             className={inputClass}
             value={values.sellerSolanaAddress}
@@ -106,19 +108,19 @@ export default function NewObligationPage() {
         </label>
         <div className="grid gap-4 sm:grid-cols-4">
           <label className="block space-y-1 text-sm">
-            <span>Monto total (USDC)</span>
+            <span>{t("new.f.total")}</span>
             <input className={inputClass} value={values.totalUsdc} onChange={set("totalUsdc")} name="totalUsdc" inputMode="decimal" />
           </label>
           <label className="block space-y-1 text-sm">
-            <span>Cuotas</span>
+            <span>{t("new.f.count")}</span>
             <input className={inputClass} value={values.installmentCount} onChange={set("installmentCount")} name="installmentCount" inputMode="numeric" />
           </label>
           <label className="block space-y-1 text-sm">
-            <span>Primer vencimiento</span>
+            <span>{t("new.f.first")}</span>
             <input type="date" className={inputClass} value={values.firstDueDate} onChange={set("firstDueDate")} name="firstDueDate" />
           </label>
           <label className="block space-y-1 text-sm">
-            <span>Intervalo (días)</span>
+            <span>{t("new.f.interval")}</span>
             <input className={inputClass} value={values.intervalDays} onChange={set("intervalDays")} name="intervalDays" inputMode="numeric" />
           </label>
         </div>
@@ -134,12 +136,12 @@ export default function NewObligationPage() {
         {parsed.ok && (
           <section className="space-y-2" data-testid="preview">
             <h2 className="font-semibold">
-              Vista previa: {parsed.args[4]} × {formatUsdc(parsed.args[3])} USDC
+              {t("new.preview", { n: parsed.args[4], amount: formatUsdc(parsed.args[3], lang) })}
             </h2>
             <ol className="grid grid-cols-2 gap-x-6 text-sm text-white/70 sm:grid-cols-3">
               {parsed.schedule.map((s) => (
                 <li key={s.number} data-testid="preview-row">
-                  Cuota {s.number}: {formatDate(s.dueDate)}
+                  {t("new.previewRow", { n: s.number, date: formatDate(s.dueDate, lang) })}
                 </li>
               ))}
             </ol>
@@ -158,9 +160,9 @@ export default function NewObligationPage() {
           className="rounded bg-green-600 px-4 py-2 font-semibold disabled:opacity-40"
           data-testid="submit"
         >
-          {busy ? "Esperando confirmación…" : "Crear obligación"}
+          {busy ? t("common.waiting") : t("new.submit")}
         </button>
-        {!account && <p className="text-xs text-white/50">Conectá la wallet del acreedor para poder crear.</p>}
+        {!account && <p className="text-xs text-white/50">{t("new.hint")}</p>}
       </form>
     </main>
   );

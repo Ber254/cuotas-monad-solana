@@ -1,6 +1,7 @@
 import { Connection, PublicKey, type Transaction } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { buildPaymentTransaction, solanaRpcUrl, usdcMint } from "./solana";
+import { localizeMessage, tEs, type Translator } from "./i18n";
 
 type PhantomProvider = {
   isPhantom?: boolean;
@@ -72,8 +73,8 @@ async function waitForConfirmation(connection: Connection, signature: string, ti
   throw new Error("Tiempo agotado esperando la confirmación en Solana (la tx puede haberse enviado igual: revisá el explorer).");
 }
 
-export function solanaErrorMessage(e: unknown): string {
+export function solanaErrorMessage(e: unknown, t: Translator = tEs): string {
   const err = e as { code?: number; message?: string };
-  if (err.code === 4001) return "Rechazaste la operación en Phantom.";
-  return err.message?.split("\n")[0] ?? "Error desconocido.";
+  if (err.code === 4001) return t("sol.rejected");
+  return localizeMessage(err.message?.split("\n")[0] ?? t("err.unknown"), t);
 }

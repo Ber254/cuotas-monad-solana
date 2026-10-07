@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getAddress, isAddress, type Address } from "viem";
+import { useT } from "@/components/LangProvider";
 import { MarkPaidButton } from "@/components/MarkPaidButton";
 import { PayWithSolanaButton } from "@/components/PayWithSolanaButton";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -37,6 +38,7 @@ export function InstallmentsTable({
   rows: InstallmentRow[];
 }) {
   const router = useRouter();
+  const { lang, t } = useT();
   const account = useAccount();
   const [selected, setSelected] = useState<number[]>([]);
   const [newCreditor, setNewCreditor] = useState("");
@@ -51,10 +53,10 @@ export function InstallmentsTable({
 
   const addrOk = isAddress(newCreditor.trim(), { strict: false });
   const problems: string[] = [];
-  if (newCreditor && !addrOk) problems.push("La dirección del nuevo acreedor no es válida.");
-  if (addrOk && newCreditor.trim().toLowerCase() === buyer.toLowerCase()) problems.push("El nuevo acreedor no puede ser el deudor (PYME).");
-  if (addrOk && account && newCreditor.trim().toLowerCase() === account.toLowerCase()) problems.push("El nuevo acreedor no puede ser vos mismo.");
-  if (newSolana && !isSolanaWallet(newSolana.trim())) problems.push("La cuenta Solana del nuevo acreedor debe ser una wallet válida (no una cuenta PDA/programa).");
+  if (newCreditor && !addrOk) problems.push(t("cede.err.addr"));
+  if (addrOk && newCreditor.trim().toLowerCase() === buyer.toLowerCase()) problems.push(t("cede.err.buyer"));
+  if (addrOk && account && newCreditor.trim().toLowerCase() === account.toLowerCase()) problems.push(t("cede.err.self"));
+  if (newSolana && !isSolanaWallet(newSolana.trim())) problems.push(t("cede.err.wallet"));
   const canSubmit = !!account && selectedValid.length > 0 && addrOk && !!newSolana.trim() && problems.length === 0 && !busy;
 
   const toggle = (n: number) => setSelected((s) => (s.includes(n) ? s.filter((x) => x !== n) : [...s, n]));
@@ -64,7 +66,7 @@ export function InstallmentsTable({
     try {
       await connectWallet();
     } catch (e) {
-      setError(errorMessage(e));
+      setError(errorMessage(e, t));
     }
   }
 
@@ -87,7 +89,7 @@ export function InstallmentsTable({
       setNewSolana("");
       router.refresh();
     } catch (e) {
-      setError(errorMessage(e));
+      setError(errorMessage(e, t));
     } finally {
       setBusy(false);
     }
@@ -95,19 +97,19 @@ export function InstallmentsTable({
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">Pagarés (cuotas)</h2>
+      <h2 className="text-lg font-semibold">{t("tbl.title")}</h2>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="text-left text-white/60">
             <tr className="border-b border-white/15">
-              <th className="py-2 pr-3">N°</th>
-              <th>Monto (USDC)</th>
-              <th>Vencimiento</th>
-              <th>Estado (Monad)</th>
-              <th>Acreedor</th>
-              <th>Pagada el</th>
-              <th>Pago (Solana)</th>
-              <th>Acción</th>
+              <th className="py-2 pr-3">{t("tbl.n")}</th>
+              <th>{t("tbl.amount")}</th>
+              <th>{t("tbl.due")}</th>
+              <th>{t("tbl.status")}</th>
+              <th>{t("tbl.creditor")}</th>
+              <th>{t("tbl.paidOn")}</th>
+              <th>{t("tbl.payment")}</th>
+              <th>{t("tbl.action")}</th>
             </tr>
           </thead>
           <tbody>
@@ -117,7 +119,7 @@ export function InstallmentsTable({
                 <tr key={i.number} className="border-b border-white/5" data-testid="installment-row">
                   <td className="py-2 pr-3">
                     {i.status !== "PAID" && mine(i) ? (
-                      <label className="flex items-center gap-2" title="Seleccionar para ceder">
+                      <label className="flex items-center gap-2" title={t("tbl.selectTitle")}>
                         <input type="checkbox" checked={selected.includes(i.number)} onChange={() => toggle(i.number)} data-testid="cede-select" />
                         {i.number}
                       </label>
@@ -125,17 +127,17 @@ export function InstallmentsTable({
                       i.number
                     )}
                   </td>
-                  <td>{formatUsdc(BigInt(i.amount))}</td>
-                  <td>{formatDate(BigInt(i.dueDate))}</td>
+                  <td>{formatUsdc(BigInt(i.amount), lang)}</td>
+                  <td>{formatDate(BigInt(i.dueDate), lang)}</td>
                   <td>
                     <StatusBadge status={i.status} testId="installment-status" />
                   </td>
                   <td className="font-mono text-xs" data-testid="installment-creditor" title={i.creditor}>
                     {shortAddress(i.creditor)}
-                    {ceded && <span className="ml-1 rounded bg-purple-500/20 px-1 text-purple-200" data-testid="ceded-badge">cedido</span>}
-                    {mine(i) && <span className="ml-1 text-white/50">(vos)</span>}
+                    {ceded && <span className="ml-1 rounded bg-purple-500/20 px-1 text-purple-200" data-testid="ceded-badge">{t("tbl.assigned")}</span>}
+                    {mine(i) && <span className="ml-1 text-white/50">{t("tbl.you")}</span>}
                   </td>
-                  <td>{BigInt(i.paidAt) > BigInt(0) ? formatDate(BigInt(i.paidAt)) : "—"}</td>
+                  <td>{BigInt(i.paidAt) > BigInt(0) ? formatDate(BigInt(i.paidAt), lang) : "—"}</td>
                   <td className="font-mono break-all" data-testid="payment-ref" title={i.paymentRef}>
                     {isSolanaSignature(i.paymentRef) ? (
                       <a className="underline" href={explorerTxUrl(i.paymentRef)} target="_blank" data-testid="payment-ref-link">
@@ -167,14 +169,12 @@ export function InstallmentsTable({
 
       {account && ceable.length > 0 && (
         <div className="rounded border border-purple-400/30 bg-purple-500/5 p-4 space-y-3 text-sm" data-testid="cede-panel">
-          <div className="font-semibold text-purple-200">Ceder pagarés a otro acreedor</div>
+          <div className="font-semibold text-purple-200">{t("cede.title")}</div>
           <p className="text-white/70">
-            Marcá en la tabla los pagarés que querés ceder ({selectedValid.length} seleccionados de {ceable.length} que son tuyos). Desde la
-            cesión, el deudor paga a la cuenta Solana del nuevo acreedor y solo él (o el verificador) puede marcarlos pagados. El precio de la
-            cesión se acuerda aparte: acá no se mueve dinero.
+            {t("cede.help", { sel: selectedValid.length, total: ceable.length })}
           </p>
           <label className="block space-y-1">
-            <span>Dirección EVM del nuevo acreedor</span>
+            <span>{t("cede.evm")}</span>
             <input
               className="w-full rounded border border-white/20 bg-white/5 px-3 py-2 font-mono text-sm"
               value={newCreditor}
@@ -184,7 +184,7 @@ export function InstallmentsTable({
             />
           </label>
           <label className="block space-y-1">
-            <span>Cuenta Solana del nuevo acreedor (donde cobrará los USDC)</span>
+            <span>{t("cede.sol")}</span>
             <input
               className="w-full rounded border border-white/20 bg-white/5 px-3 py-2 font-mono text-sm"
               value={newSolana}
@@ -207,23 +207,21 @@ export function InstallmentsTable({
             className="rounded bg-purple-600 px-4 py-2 font-semibold disabled:opacity-40"
             data-testid="cede-submit"
           >
-            {busy ? "Esperando confirmación…" : `Ceder ${selectedValid.length} pagaré${selectedValid.length === 1 ? "" : "s"}`}
+            {busy ? t("common.waiting") : t(selectedValid.length === 1 ? "cede.submit.one" : "cede.submit.many", { n: selectedValid.length })}
           </button>
           {error && <p className="text-red-300" data-testid="cede-error">{error}</p>}
-          {done && <p className="text-green-300" data-testid="cede-done">Cesión registrada en Monad. Transacción: {done}</p>}
+          {done && <p className="text-green-300" data-testid="cede-done">{t("cede.done")} {done}</p>}
         </div>
       )}
       {!account && (
         <button type="button" onClick={onConnect} className="text-xs underline text-white/60" data-testid="table-connect">
-          Conectar wallet para ver tus pagarés y poder ceder
+          {t("tbl.connectHint")}
         </button>
       )}
       {error && !ceable.length && <p className="text-red-300 text-sm">{error}</p>}
 
       <p className="text-xs text-white/50">
-        OVERDUE se calcula al leer (impaga y vencida); no se guarda on-chain. El pago con USDC en Solana se envía con Phantom (devnet) y el
-        servidor verifica la tx (mint, destino = cuenta del acreedor ACTUAL de ese pagaré, monto, memo) antes de marcar la cuota PAID en
-        Monad. La confirmación manual del acreedor sigue disponible como respaldo.
+        {t("tbl.footer")}
       </p>
     </section>
   );
