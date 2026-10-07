@@ -2,6 +2,8 @@
 
 ## Objetivo
 
+**Web publicada (2026-10-07): https://cuotas-monad-solana-fjez.vercel.app** (ver STATUS). Quedan: pago real contra el verificador de Vercel, Phantom en el navegador (opcional), borrar el proyecto Vercel viejo `cuotas-monad-solana`, y ensayo completo antes de presentar.
+
 **Avance real (2026-10-07):** primer pago real de punta a punta ✅ (ver STATUS). Quedan: ver el resultado en la UI, probar la **cesión con dos wallets reales** (pagaré 2 → Account 2 u otra), pagar con **Phantom** desde el navegador, publicar en **Vercel** y un ensayo completo.
 
 **Hecho (2026-10-07): contrato redesplegado** en Monad Testnet: `0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e` (owner = wallet personal `0x316A…25dc`, verifier = `0xFb17…9156` (rotado 2026-10-07)); `real:preflight` ✓. 

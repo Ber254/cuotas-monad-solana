@@ -15,7 +15,7 @@ Etapas chicas e independientes. ✅ = terminada **y probada**; 🟡 = parcial; �
 | 9 | Confirmación automática: `/api/payments/confirm` | ✅ | **Probado contra Solana devnet y Monad Testnet reales** (2026-10-07): tx real aceptada (HTTP 200) y cuota marcada PAID on-chain; ver STATUS (firma y hash). Además `test:verify`, `test:onchain`, E2E |
 | 10 | Demo end-to-end (proveedor, PYME, pagarés, todos pagados → COMPLETED) | ✅ | **Real**: obligación #1 creada desde la UI, 2 pagarés pagados en Solana devnet con verificación y registro en Monad Testnet, con cesión intermedia (ver STATUS). Los pagos se hicieron por CLI; **falta repetir el pago desde el navegador con Phantom** |
 | 11 | Testing (unit del verificador Solana, e2e) | ✅ | `./scripts/run-local-e2e.sh`: forge 10/10, `test:create`, `test:solana`, `test:verify`, `test:onchain`, E2E 28/28 (+ forge 16/16) |
-| 12 | Deploy (Monad Testnet + Vercel para `web/`) | 🟡 | Contrato en Monad Testnet ✅ (Devin). Web **preparada y verificada en local** con la config de Testnet (build, `check:deploy` anti-fuga, `/api/health`, degradación sin RPC) + guía `DEPLOY.md`. **No desplegada en Vercel** (sin acceso) |
+| 12 | Deploy (Monad Testnet + Vercel para `web/`) | ✅ | Contrato en Monad Testnet ✅ (`0x8d7c…`) y web en Vercel ✅ (https://cuotas-monad-solana-fjez.vercel.app); `/api/health` ok con la clave del verifier verificada contra el contrato. Falta probar un pago real contra el verificador de Vercel; borrar el proyecto Vercel viejo |
 | 13 | Cesión de pagarés (el proveedor cede cuotas a un tercero) | ✅ | **Probada con redes reales** (2026-10-07): cesión desde la UI con MetaMask, pago al acreedor nuevo verificado y registrado (ver STATUS) + contrato 16 tests, E2E 28/28. Límites en D22 |
 
 Notas:

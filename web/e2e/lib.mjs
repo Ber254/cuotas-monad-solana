@@ -50,8 +50,8 @@ export const closeBrowser = () => browser?.close();
  * phantom: false | { rejectConnect, rejectSend, amountDelta, memoOverride, destinationOverride }
  * solBalance: saldo USDC (unidades mínimas) que devuelve el RPC de Solana del cliente.
  */
-export async function newPage({ evm = false, phantom = false, solBalance = "5000000000", viewport } = {}) {
-  const page = await (await browser.newContext({ viewport })).newPage();
+export async function newPage({ evm = false, phantom = false, solBalance = "5000000000", viewport, locale = "es-AR" } = {}) {
+  const page = await (await browser.newContext({ viewport, locale })).newPage();
   page.errors = [];
   page.on("pageerror", (e) => page.errors.push(e.message));
   await page.exposeFunction("__rpc", async (method, params) => {

@@ -1,4 +1,5 @@
 import { BaseError, ContractFunctionRevertedError, createWalletClient, custom, parseEventLogs, toHex, type Address, type EIP1193Provider, type Hex } from "viem";
+import { localizeMessage, tEs, type MessageKey, type Translator } from "./i18n";
 import { installmentRegistryAbi } from "./abi";
 import { installmentRegistryBytecode } from "./bytecode";
 import type { CreateObligationArgs } from "./obligationForm";
@@ -86,18 +87,22 @@ const CONTRACT_ERRORS: Record<string, string> = {
 };
 
 /** Mensaje corto y legible para errores de wallet/viem. */
-export function errorMessage(e: unknown): string {
+export function errorMessage(e: unknown, t: Translator = tEs): string {
+  return localizeMessage(rawErrorMessage(e, t), t);
+}
+
+function rawErrorMessage(e: unknown, t: Translator): string {
   const err = e as { shortMessage?: string; message?: string; code?: number };
-  if (err.code === 4001) return "Rechazaste la operación en la wallet.";
+  if (err.code === 4001) return t("err.rejected");
   if (e instanceof BaseError) {
     // viem anida el rechazo del usuario (code 4001) dentro de TransactionExecutionError, etc.
     if (e.walk((x) => (x as { code?: number }).code === 4001 || (x as Error).name === "UserRejectedRequestError"))
-      return "Rechazaste la operación en la wallet.";
+      return t("err.rejected");
     const revert = e.walk((x) => x instanceof ContractFunctionRevertedError);
     const name = revert instanceof ContractFunctionRevertedError ? revert.data?.errorName : undefined;
-    if (name && CONTRACT_ERRORS[name]) return CONTRACT_ERRORS[name];
+    if (name && CONTRACT_ERRORS[name]) return t(`ce.${name}` as MessageKey);
   }
-  return err.shortMessage ?? err.message?.split("\n")[0] ?? "Error desconocido.";
+  return err.shortMessage ?? err.message?.split("\n")[0] ?? t("err.unknown");
 }
 
 /** Marca una cuota como pagada (confirmación manual del acreedor, D6). Devuelve el hash de la tx. */

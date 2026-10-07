@@ -2,16 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/components/LangProvider";
+import { tEs, type Lang } from "@/lib/i18n";
 import { payInstallmentWithSolana, solanaErrorMessage } from "@/lib/phantom";
 import { explorerTxUrl, paymentMemo } from "@/lib/solana";
 
 /** Pide al servidor verificar el pago en Solana y registrarlo en Monad; reintenta si el RPC aún no ve la tx. */
-async function confirmOnServer(obligationId: string, number: number, signature: string): Promise<void> {
-  let last = "No se pudo confirmar el pago.";
+async function confirmOnServer(obligationId: string, number: number, signature: string, lang: Lang): Promise<void> {
+  let last = tEs("sol.confirmFailed");
   for (let attempt = 0; attempt < 6; attempt++) {
     const res = await fetch("/api/payments/confirm", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "accept-language": lang },
       body: JSON.stringify({ obligationId, number, signature }),
     });
     const body = (await res.json().catch(() => ({}))) as { error?: string; retryable?: boolean };
@@ -34,6 +36,7 @@ export function PayWithSolanaButton(props: {
   sellerSolanaAddress: string;
 }) {
   const router = useRouter();
+  const { lang, t } = useT();
   const [busy, setBusy] = useState(false);
   const [signature, setSignature] = useState<string>();
   const [error, setError] = useState<string>();
@@ -43,10 +46,10 @@ export function PayWithSolanaButton(props: {
     setBusy(true);
     setConfirmError(undefined);
     try {
-      await confirmOnServer(props.obligationId, props.number, sig);
+      await confirmOnServer(props.obligationId, props.number, sig, lang);
       router.refresh();
     } catch (e) {
-      setConfirmError(solanaErrorMessage(e));
+      setConfirmError(solanaErrorMessage(e, t));
     } finally {
       setBusy(false);
     }
@@ -64,7 +67,7 @@ export function PayWithSolanaButton(props: {
         number: props.number,
       });
     } catch (e) {
-      setError(solanaErrorMessage(e));
+      setError(solanaErrorMessage(e, t));
       setBusy(false);
       return;
     }
@@ -75,19 +78,19 @@ export function PayWithSolanaButton(props: {
   if (signature) {
     return (
       <div className="text-xs space-y-1" data-testid="sol-sent">
-        <div className="text-green-300">Pago enviado en Solana</div>
+        <div className="text-green-300">{t("pay.sent")}</div>
         <a className="underline break-all" href={explorerTxUrl(signature)} target="_blank" data-testid="sol-signature">
           {signature.slice(0, 12)}…
         </a>
-        <div className="text-white/50">Memo: {paymentMemo(props.obligationId, props.number)}</div>
-        {busy && <div className="text-white/70">Verificando el pago y registrándolo en Monad…</div>}
+        <div className="text-white/50">{t("pay.memo")}: {paymentMemo(props.obligationId, props.number)}</div>
+        {busy && <div className="text-white/70">{t("pay.verifying")}</div>}
         {confirmError && (
           <div className="space-y-1">
             <div className="text-red-300" data-testid="confirm-error">
               {confirmError}
             </div>
             <button type="button" onClick={() => verify(signature)} className="underline" data-testid="retry-verify">
-              Reintentar verificación (no vuelve a cobrar)
+              {t("pay.retry")}
             </button>
           </div>
         )}
@@ -103,7 +106,7 @@ export function PayWithSolanaButton(props: {
         className="rounded bg-purple-600 px-2 py-1 text-xs font-semibold disabled:opacity-40"
         data-testid="pay-solana"
       >
-        {busy ? "Pagando…" : "Pagar con Solana"}
+        {busy ? t("pay.busy") : t("pay.button")}
       </button>
       {error && (
         <div className="text-xs text-red-300" data-testid="pay-solana-error">

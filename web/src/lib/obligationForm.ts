@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { getAddress, isAddress, parseUnits, type Address } from "viem";
+import { tEs, type Translator } from "./i18n";
 import { MAX_INSTALLMENTS, SECONDS_PER_DAY, USDC_DECIMALS } from "./constants";
 
 /** Valores crudos del formulario (strings tal como los escribe el usuario). */
@@ -43,63 +44,64 @@ export function parseObligationForm(
   v: ObligationFormValues,
   account: string | undefined,
   nowSeconds: number,
+  t: Translator = tEs,
 ): ParsedObligation {
   const errors: string[] = [];
 
   const description = v.description.trim();
-  if (!description) errors.push("Ingresá una descripción.");
+  if (!description) errors.push(t("form.desc"));
 
   let buyer: Address | undefined;
   if (!isAddress(v.buyer.trim(), { strict: false })) {
-    errors.push("La dirección EVM de la PYME deudora no es válida.");
+    errors.push(t("form.buyerInvalid"));
   } else {
     buyer = getAddress(v.buyer.trim().toLowerCase());
-    if (/^0x0{40}$/.test(buyer.toLowerCase())) errors.push("La PYME deudora no puede ser la dirección cero.");
+    if (/^0x0{40}$/.test(buyer.toLowerCase())) errors.push(t("form.buyerZero"));
     else if (account && buyer.toLowerCase() === account.toLowerCase())
-      errors.push("La PYME deudora no puede ser la misma wallet que crea la obligación (acreedor).");
+      errors.push(t("form.buyerSelf"));
   }
 
   const solana = v.sellerSolanaAddress.trim();
-  if (!BASE58_PUBKEY.test(solana)) errors.push("La cuenta Solana del acreedor debe ser una pubkey base58 (32–44 caracteres).");
+  if (!BASE58_PUBKEY.test(solana)) errors.push(t("form.solanaFormat"));
   else if (!isSolanaWallet(solana))
-    errors.push("La cuenta Solana del acreedor debe ser una wallet (una cuenta PDA/programa no puede recibir USDC con este flujo).");
+    errors.push(t("form.solanaWallet"));
 
   let count = 0;
-  if (!/^\d+$/.test(v.installmentCount.trim())) errors.push("La cantidad de cuotas debe ser un entero.");
+  if (!/^\d+$/.test(v.installmentCount.trim())) errors.push(t("form.countInt"));
   else {
     count = Number(v.installmentCount.trim());
-    if (count < 1 || count > MAX_INSTALLMENTS) errors.push(`La cantidad de cuotas debe estar entre 1 y ${MAX_INSTALLMENTS}.`);
+    if (count < 1 || count > MAX_INSTALLMENTS) errors.push(t("form.countRange", { max: MAX_INSTALLMENTS }));
   }
 
   let total: bigint | undefined;
-  if (!/^\d+(\.\d{1,6})?$/.test(v.totalUsdc.trim())) errors.push("El monto total debe ser un número positivo con hasta 6 decimales.");
+  if (!/^\d+(\.\d{1,6})?$/.test(v.totalUsdc.trim())) errors.push(t("form.totalFormat"));
   else {
     total = parseUnits(v.totalUsdc.trim(), USDC_DECIMALS);
-    if (total <= BigInt(0)) errors.push("El monto total debe ser mayor a 0.");
+    if (total <= BigInt(0)) errors.push(t("form.totalPositive"));
   }
 
   let amount: bigint | undefined;
   if (total && count >= 1 && count <= MAX_INSTALLMENTS) {
-    if (total % BigInt(count) !== BigInt(0)) errors.push("El monto total debe dividirse exacto entre las cuotas (sin centésimas de USDC sobrantes).");
+    if (total % BigInt(count) !== BigInt(0)) errors.push(t("form.totalDivisible"));
     else amount = total / BigInt(count);
   }
 
   let firstDue = 0;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.firstDueDate)) errors.push("Ingresá la fecha del primer vencimiento.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.firstDueDate)) errors.push(t("form.dateMissing"));
   else {
     // Mediodía UTC: la fecha se ve igual en cualquier zona horaria.
     firstDue = Math.floor(Date.parse(`${v.firstDueDate}T12:00:00Z`) / 1000);
     if (Number.isNaN(firstDue) || firstDue <= nowSeconds) {
-      errors.push("El primer vencimiento debe ser una fecha futura.");
+      errors.push(t("form.dateFuture"));
       firstDue = 0;
     }
   }
 
   let intervalSeconds = 0;
-  if (!/^\d+$/.test(v.intervalDays.trim())) errors.push("El intervalo debe ser un entero de días.");
+  if (!/^\d+$/.test(v.intervalDays.trim())) errors.push(t("form.intervalInt"));
   else {
     const days = Number(v.intervalDays.trim());
-    if (days < 1 && count > 1) errors.push("Con más de una cuota el intervalo debe ser de al menos 1 día.");
+    if (days < 1 && count > 1) errors.push(t("form.intervalMin"));
     intervalSeconds = days * SECONDS_PER_DAY;
   }
 

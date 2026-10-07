@@ -31,6 +31,10 @@ cd web && npm install && npm run dev # http://localhost:3000
 
 Requisitos: Node 20+, [Foundry](https://getfoundry.sh).
 
+## Demo en vivo
+
+https://cuotas-monad-solana-fjez.vercel.app (Monad Testnet + Solana devnet). Estado: [`/api/health`](https://cuotas-monad-solana-fjez.vercel.app/api/health).
+
 ## Probar todo
 
 ```bash
