@@ -2,6 +2,8 @@
 
 ## Objetivo
 
+**Avance real (2026-10-07):** primer pago real de punta a punta ✅ (ver STATUS). Quedan: ver el resultado en la UI, probar la **cesión con dos wallets reales** (pagaré 2 → Account 2 u otra), pagar con **Phantom** desde el navegador, publicar en **Vercel** y un ensayo completo.
+
 **Hecho (2026-10-07): contrato redesplegado** en Monad Testnet: `0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e` (owner = wallet personal `0x316A…25dc`, verifier = `0x71fE…cA70`); `real:preflight` ✓. 
 
 Luego: desplegar la web (Vercel) y hacer **la corrida real de punta a punta** con Solana devnet, Monad Testnet y wallets reales. Es lo único del MVP sin probar; todo lo demás está cubierto por `./scripts/run-local-e2e.sh` (20/20 al 2026-10-05). **Requiere acciones que solo puede hacer una persona con acceso** (Vercel, wallets, faucets, redes no bloqueadas): si el agente no tiene ese acceso, debe preparar lo que falte y pedirle al usuario que ejecute los pasos de `DEPLOY.md` y `DEMO.md` § B, sin marcar nada como ✅.
