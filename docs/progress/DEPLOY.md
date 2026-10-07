@@ -43,7 +43,7 @@ VERIFIER_PRIVATE_KEY=<clave> npm run build && VERIFIER_PRIVATE_KEY=<clave> npm r
 Antes y después de desplegar, `npm run real:preflight` (en `web/`, con las mismas variables) valida mint, contrato, saldo del verifier y que la clave sea la del verifier.
 
 Después de desplegar:
-1. `GET https://<tu-app>/api/health` → debe dar **200** con `ok: true`, `verifierKeyConfigured: true`, `obligationCount` numérico. Si da 503, `problems` dice qué falta. No expone secretos.
+1. `GET https://<tu-app>/api/health` → debe dar **200** con `ok: true`, `verifierKeyConfigured: true`, `obligationCount` numérico y, además, `verifierAddress` (dirección pública derivada de `VERIFIER_PRIVATE_KEY`) **igual a** `contractVerifier` (el verifier del contrato). Si la clave cargada es inválida o no corresponde al verifier del contrato, responde 503 con el motivo (probado), sin mostrar la clave. Si da 503, `problems` dice qué falta. No expone secretos.
 2. Abrir `/`: debe mostrar red "Monad Testnet (chainId 10143)" y el contrato.
 3. Seguir `DEMO.md` § B (corrida real de punta a punta).
 

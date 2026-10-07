@@ -1,7 +1,7 @@
 // Suite E2E completa (Chromium + wallets simuladas + anvil + RPC Solana simulado).
 // Se corre con scripts/run-local-e2e.sh, que levanta anvil, el mock de Solana y la web.
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -53,8 +53,28 @@ await test("/api/health: configuración lista y contrato legible (sin exponer se
   assert.equal(res.status, 200, JSON.stringify(body));
   assert.equal(body.ok, true);
   assert.equal(body.config.verifierKeyConfigured, true);
+  assert.equal(body.config.verifierAddress, ACCOUNTS.seller, "la clave del servidor corresponde al verifier del contrato");
+  assert.equal(body.config.contractVerifier.toLowerCase(), ACCOUNTS.seller.toLowerCase());
   assert.match(body.obligationCount, /^\d+$/);
   assert.ok(!JSON.stringify(body).includes("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), "no debe exponer la clave");
+});
+await test("/api/health detecta una clave de verifier equivocada o inválida (503 con el motivo, sin exponer la clave)", async () => {
+  const WRONG = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"; // anvil 2: no es el verifier
+  for (const [key, expected] of [[WRONG, /NO es el verifier del contrato/], ["vacio", /no es una clave privada válida/]]) {
+    const srv = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", "3101"], { cwd: path.resolve(import.meta.dirname, ".."), env: { ...process.env, VERIFIER_PRIVATE_KEY: key }, stdio: "ignore" });
+    try {
+      let body, status;
+      for (let i = 0; i < 40 && !body; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try { const res = await fetch("http://localhost:3101/api/health"); status = res.status; body = await res.json(); } catch {}
+      }
+      assert.ok(body, "la instancia de prueba no arrancó");
+      assert.equal(status, 503, JSON.stringify(body));
+      assert.equal(body.ok, false);
+      assert.match(body.problems.join(" | "), expected);
+      assert.ok(!JSON.stringify(body).includes(key.slice(2)) && !JSON.stringify(body).includes(key), "no debe exponer la clave");
+    } finally { srv.kill("SIGKILL"); }
+  }
 });
 await test("404 para ids inexistentes o inválidos", async () => {
   const page = await newPage();
