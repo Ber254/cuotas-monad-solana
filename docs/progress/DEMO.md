@@ -30,7 +30,7 @@ Requisitos: Phantom en devnet con SOL y USDC devnet (faucet.circle.com), MetaMas
 
 **Herramientas (probadas contra la pila local; falta correrlas contra las redes reales):**
 ```bash
-cd web   # con NEXT_PUBLIC_CHAIN_ID=10143, NEXT_PUBLIC_REGISTRY_ADDRESS=0xF7a6…C321, SOLANA_RPC_URL, SOLANA_USDC_MINT, VERIFIER_PRIVATE_KEY exportadas
+cd web   # con NEXT_PUBLIC_CHAIN_ID=10143, NEXT_PUBLIC_REGISTRY_ADDRESS=0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e, SOLANA_RPC_URL, SOLANA_USDC_MINT, VERIFIER_PRIVATE_KEY exportadas
 npm run real:preflight                                   # conectividad, mint USDC (decimales, owner), contrato, saldo del verifier,
                                                          # y que VERIFIER_PRIVATE_KEY sea realmente el verifier (si no: NotAuthorized)
 npm run pay:devnet -- --keypair ~/.config/solana/id.json --obligation <id> --number <n> --confirm https://<app>
