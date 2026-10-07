@@ -66,6 +66,11 @@ Evidencia (redes reales: Solana devnet + Monad Testnet), por CLI con `npm run pa
 - ✓ **Cobro confirmado en el explorador de Solana (devnet):** el proveedor original `GBSX…ccqBD` y el nuevo acreedor `5m7X…wihex` tienen 5 USDC cada uno; la UI mostró la obligación #1 en COMPLETED con ambos pagarés PAID.
 - **Todavía NO probado en real:** Phantom y el pago desde el navegador (todos los pagos reales fueron por CLI `pay:devnet`); Vercel.
 
+## 🔐 Incidente y rotación del verifier (2026-10-07)
+- Al cargar la clave en Vercel, la clave privada del verifier (`0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70`) se pegó por error como comando en PowerShell y quedó **impresa en el chat con el asistente**. Se trató como comprometida: se generó un verifier nuevo (`npm run verifier:new -- --force`), se fondeó con 0,3 MON y se asignó con `/admin/verifier` (tx `0x026c603c516ba9403a37bf8051e7b4266f2f0bccb9b2da40324b0b6495b1c7a2`). `real:preflight` ✓: `verifier=0xFb17de8652A857De135d14898712Fe45e4509156`, la clave nueva corresponde, owner distinto.
+- **Verifier vigente: `0xFb17de8652A857De135d14898712Fe45e4509156`.** La clave vieja ya no puede marcar pagos. La nueva existe solo en `web/.verifier-key` (y, cuando se publique, en Vercel como variable Sensitive); nunca debe pegarse en una terminal ni en un chat.
+- Lecciones: (1) copiar con `Get-Content .verifier-key | Set-Clipboard` y pegar **solo** en el campo de Vercel; (2) `Set-Clipboard -Value ""` falla en esta versión de PowerShell: usar `Set-Clipboard -Value "vacio"` y borrar el historial (Windows+V); (3) `verifier:new` ahora podría pedir confirmación antes de `--force` (pendiente).
+
 ## Sin probar / riesgos (honesto)
 - Nada contra **Solana devnet** ni **Monad Testnet**; nada con **MetaMask/Phantom** reales. El formato `jsonParsed` real podría diferir de las fixtures → el verificador rechazaría pagos válidos; probar primero eso.
 - **Mint USDC devnet (corregido 2026-10-06):** la dirección que había puesto de memoria (`4zMMC9sr…ZKqt`) era **inventada en su final y no existe** en devnet (confirmado con `real:preflight`, con el RPC y con Solana Explorer). La correcta, copiada de la documentación de Circle por el usuario, es `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`; **falta confirmar con `npm run real:preflight`** que existe, es de SPL Token y tiene 6 decimales. Configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT` / `SOLANA_USDC_MINT`.
@@ -114,7 +119,7 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 ## Direcciones desplegadas
 | Red | InstallmentRegistry | verifier | fecha |
 |---|---|---|---|
-| Monad Testnet (10143) — **ACTUAL (con cesión de pagarés)** | [`0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e`](https://testnet.monadexplorer.com/address/0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e) | `0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70` (wallet dedicada); owner `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` | 2026-10-07, desplegado desde `/admin/deploy` firmando con MetaMask; `real:preflight` ✓ |
+| Monad Testnet (10143) — **ACTUAL (con cesión de pagarés)** | [`0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e`](https://testnet.monadexplorer.com/address/0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e) | `0xFb17de8652A857De135d14898712Fe45e4509156` (wallet dedicada, **rotada 2026-10-07**; la anterior `0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70` quedó revocada); owner `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` | 2026-10-07, desplegado desde `/admin/deploy` firmando con MetaMask; `real:preflight` ✓ |
 | Monad Testnet (10143) — OBSOLETO (sin cesión) | `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` | (verifier = owner, ahora superado) | 2026-10-03 (Devin); 0 obligaciones, no se usa más |
 
 ## Última tarea realizada
