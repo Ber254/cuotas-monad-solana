@@ -21,7 +21,7 @@ Si cambia el contrato (p. ej. la cesión de pagarés, D22): `./scripts/export-ab
 |---|---|---|
 | `NEXT_PUBLIC_CHAIN_ID` | `10143` | pública (build) |
 | `NEXT_PUBLIC_MONAD_RPC_URL` | `https://testnet-rpc.monad.xyz` | pública (build) |
-| `NEXT_PUBLIC_REGISTRY_ADDRESS` | `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` | pública (build) |
+| `NEXT_PUBLIC_REGISTRY_ADDRESS` | `0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e` | pública (build) |
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | RPC devnet (el público tiene rate limit; mejor uno propio: Helius/QuickNode/Alchemy devnet) | pública (build) |
 | `NEXT_PUBLIC_SOLANA_USDC_MINT` | mint USDC devnet **verificado** (ver `DEMO.md` § B) | pública (build) |
 | `VERIFIER_PRIVATE_KEY` | clave de la wallet verifier (§0) | **secreto (marcar Sensitive), NUNCA `NEXT_PUBLIC_`** |
@@ -35,7 +35,7 @@ Si cambia el contrato (p. ej. la cesión de pagarés, D22): `./scripts/export-ab
 Antes de subir, simular el build de producción:
 ```bash
 cd web
-NEXT_PUBLIC_CHAIN_ID=10143 NEXT_PUBLIC_REGISTRY_ADDRESS=0xF7a6e0f226ecDc708Af88679F2A9a557E918C321 \
+NEXT_PUBLIC_CHAIN_ID=10143 NEXT_PUBLIC_REGISTRY_ADDRESS=0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e \
 VERIFIER_PRIVATE_KEY=<clave> npm run build && VERIFIER_PRIVATE_KEY=<clave> npm run check:deploy
 ```
 `check:deploy` falla si la clave (o cualquier `NEXT_PUBLIC_*` con nombre/forma de secreto) llegaría al navegador, o si el contrato no quedó embebido. Probado con fugas simuladas.

@@ -39,7 +39,7 @@ npm run solana:new -- --out .solana-payer.json           # wallet Solana pagador
 npm run real:tx -- <firmaSolana> <obligationId> <cuota>  # contrasta una tx real con la obligación y muestra qué ve el verificador
 ```
 1. `npm run real:preflight` debe terminar en ✓. Confirmar a mano que el mint es el USDC de devnet de Circle; si no, cambiar `SOLANA_USDC_MINT` y `NEXT_PUBLIC_SOLANA_USDC_MINT`.
-2. `web/.env.local`: `NEXT_PUBLIC_CHAIN_ID=10143`, `NEXT_PUBLIC_REGISTRY_ADDRESS=0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`, `VERIFIER_PRIVATE_KEY` de la wallet verifier **dedicada** (`DEPLOY.md` § 0), `SOLANA_RPC_URL`.
+2. `web/.env.local`: `NEXT_PUBLIC_CHAIN_ID=10143`, `NEXT_PUBLIC_REGISTRY_ADDRESS=0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e`, `VERIFIER_PRIVATE_KEY` de la wallet verifier **dedicada** (`DEPLOY.md` § 0), `SOLANA_RPC_URL`.
 3. Crear la obligación desde `/obligations/new` con MetaMask (el acreedor no puede ser el deudor); `sellerSolanaAddress` = pubkey de la wallet Phantom del acreedor (una wallet normal, no una PDA).
 4. Pagar la cuota 1 con Phantom (la pagadora necesita USDC devnet) **o** con `pay:devnet`. Si `/api/payments/confirm` responde 422 con una tx válida: `real:tx` muestra lo que devolvió Solana y por qué se rechazó; ajustar `verifyPayment.ts` y `fixtures-solana.mts`.
 5. Registrar acá la firma de Solana y el hash de Monad de la cuota pagada.

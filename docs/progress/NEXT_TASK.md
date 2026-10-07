@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-**Paso previo (nuevo, 2026-10-06): redesplegar el contrato en Monad Testnet.** El de `0xF7a6…C321` es la versión SIN cesión de pagarés (0 obligaciones, no se pierde nada). Con `NEXT_PUBLIC_ENABLE_OWNER_TOOLS=1 npm run dev` (y `NEXT_PUBLIC_CHAIN_ID=10143`) abrir `http://localhost:3000/admin/deploy`, conectar la wallet owner (MetaMask), pegar como verifier la wallet dedicada (`0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70`) y "Desplegar contrato" (firma MetaMask, sin exportar claves). Después: actualizar `NEXT_PUBLIC_REGISTRY_ADDRESS` (variables de la terminal, `web/.env.example`, tabla de "Direcciones desplegadas" de STATUS, DEPLOY, DEMO) y correr `npm run real:preflight` (debe mostrar owner = wallet personal y verifier = `0x71fE…`).
+**Hecho (2026-10-07): contrato redesplegado** en Monad Testnet: `0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e` (owner = wallet personal `0x316A…25dc`, verifier = `0x71fE…cA70`); `real:preflight` ✓. 
 
 Luego: desplegar la web (Vercel) y hacer **la corrida real de punta a punta** con Solana devnet, Monad Testnet y wallets reales. Es lo único del MVP sin probar; todo lo demás está cubierto por `./scripts/run-local-e2e.sh` (20/20 al 2026-10-05). **Requiere acciones que solo puede hacer una persona con acceso** (Vercel, wallets, faucets, redes no bloqueadas): si el agente no tiene ese acceso, debe preparar lo que falte y pedirle al usuario que ejecute los pasos de `DEPLOY.md` y `DEMO.md` § B, sin marcar nada como ✅.
 
@@ -16,7 +16,7 @@ Luego: desplegar la web (Vercel) y hacer **la corrida real de punta a punta** co
 - **Cosas que ningún agente puede hacer solo:** conseguir USDC devnet (faucet.circle.com requiere navegador), fondear con MON (faucet de Monad), aprobar firmas en MetaMask/Phantom, y crear/aprobar el proyecto en Vercel. Con red permitida, un agente sí puede correr `real:preflight`, crear la obligación con `cast` (con una clave testnet que se le provea) y pagar con `pay:devnet` (con un keypair devnet fondeado), saltándose los navegadores.
 
 ## Pasos
--1. (Nuevo) Redesplegar el contrato como se describe arriba; probar la cesión con wallets reales: el proveedor cede pagarés a una segunda wallet (`/obligations/<id>`, panel "Ceder pagarés"), el deudor paga uno al acreedor nuevo y comprobar que el verificador lo acepta. Ver `DEMO.md`.
+-1. (Nuevo) Con el contrato ya redesplegado, probar la cesión con wallets reales: el proveedor cede pagarés a una segunda wallet (`/obligations/<id>`, panel "Ceder pagarés"), el deudor paga uno al acreedor nuevo y comprobar que el verificador lo acepta. Ver `DEMO.md`.
 0. `cd web && npm run real:preflight` (ver `DEMO.md` § B): debe terminar en ✓ antes de seguir. Para pagar por CLI: `npm run pay:devnet -- --keypair … --obligation … --number … --confirm https://<app>`; para diagnosticar un 422: `npm run real:tx -- <firma> <obligationId> <cuota>`.
 1. Wallet verifier dedicada + `setVerifier` + fondearla con MON (`DEPLOY.md` § 0).
 2. Verificar el mint USDC devnet (`getAccountInfo`) y corregir `DEFAULT_USDC_DEVNET_MINT` / `.env.example` si difiere.

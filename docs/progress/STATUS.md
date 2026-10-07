@@ -53,7 +53,7 @@ Cómo funciona la simulación (importante para no confundirla con una prueba rea
 - El modelo real es **financiamiento de proveedores** (no hay inversor): el proveedor vende a crédito, la PYME firma N pagarés y los paga; el proveedor puede **ceder** pagarés a un tercero (D22). Se corrigió el lenguaje de UI/README/docs.
 - Contrato: `transferInstallments`, `getObligationsByCreditor`, acreedor y cuenta Solana por pagaré (`InstallmentView.creditor`/`creditorSolanaAddress`); `markInstallmentPaid` ahora lo autoriza el acreedor *actual* del pagaré. **Un test de forge encontró un bug mío** (mi parche de `markInstallmentPaid` no se había aplicado y el vendedor original seguía pudiendo marcar cuotas cedidas); corregido y cubierto. `forge test` 16/16.
 - Web: tabla con acreedor por pagaré + badge "cedido", panel para ceder (selección múltiple, validaciones), "Mis pagarés" en la home (proveedor/deudor/acreedor por cesión), pagos y verificación contra el acreedor actual, `/admin/deploy`. E2E 28/28 (incl. pago a la cuenta del acreedor nuevo y rechazo de un pago a la cuenta del anterior). Prueba de mutación hecha: con el verificador roto, el test falla.
-- **Pendiente:** el contrato de Monad Testnet (`0xF7a6…C321`) es la versión SIN cesión (0 obligaciones). Hay que desplegar la nueva (ver `NEXT_TASK.md`/`DEPLOY.md`) y actualizar `NEXT_PUBLIC_REGISTRY_ADDRESS` en `.env.example`, STATUS y Vercel.
+- ✓ **Redesplegado (2026-10-07):** contrato nuevo `0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e` en Monad Testnet (owner = wallet personal, verifier = `0x71fE…cA70`), firmado desde `/admin/deploy`; `real:preflight` ✓ con la clave del verifier. El anterior (`0xF7a6…C321`, sin cesión, 0 obligaciones) quedó obsoleto. `NEXT_PUBLIC_REGISTRY_ADDRESS` actualizado en `.env.example`/DEPLOY/DEMO; **falta** cargarlo en Vercel al publicar.
 - Límites (D22): carrera de pago a la cuenta anterior; sin precio/consentimiento on-chain; cesión irreversible por el cedente; sin auditoría.
 
 ## Sin probar / riesgos (honesto)
@@ -104,7 +104,8 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 ## Direcciones desplegadas
 | Red | InstallmentRegistry | verifier | fecha |
 |---|---|---|---|
-| Monad Testnet (10143) | [`0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`](https://testnet.monadexplorer.com/address/0xF7a6e0f226ecDc708Af88679F2A9a557E918C321) | `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` (= owner/deployer) | 2026-10-03, tx [`0xc4db6db4…`](https://testnet.monadexplorer.com/tx/0xc4db6db49374aff5c5c6a92b24aac41043ed19d92f9776749f8534affb4f6efd) |
+| Monad Testnet (10143) — **ACTUAL (con cesión de pagarés)** | [`0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e`](https://testnet.monadexplorer.com/address/0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e) | `0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70` (wallet dedicada); owner `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` | 2026-10-07, desplegado desde `/admin/deploy` firmando con MetaMask; `real:preflight` ✓ |
+| Monad Testnet (10143) — OBSOLETO (sin cesión) | `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` | (verifier = owner, ahora superado) | 2026-10-03 (Devin); 0 obligaciones, no se usa más |
 
 ## Última tarea realizada
 Etapa 10 (demo e2e local + guion + capturas) y batería completa de pruebas (etapa 11), con hallazgos corregidos (ver "Bugs reales"). Antes: etapas 5–9.

@@ -39,7 +39,7 @@ Lecturas con `publicClient` de viem; escrituras futuras con `createWalletClient(
 Local se usa anvil con las cuentas por defecto (`scripts/local-chain-setup.sh`). Motivo: iterar sin faucet ni claves reales.
 
 ### D13 — 2026-10-03 — Deployer = owner = verifier en Monad Testnet
-El contrato `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` se desplegó con la wallet `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, que es también `verifier`. Motivo: una sola clave para la demo. Si el verificador pasa a ser otro servicio, usar `setVerifier` (no hace falta re-desplegar).
+El contrato `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` (OBSOLETO desde D22; el actual está en STATUS) se desplegó con la wallet `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, que es también `verifier`. Motivo: una sola clave para la demo. Si el verificador pasa a ser otro servicio, usar `setVerifier` (no hace falta re-desplegar).
 
 ### D14 — 2026-10-03 — Producto renombrado a Finvia; foco en financiamiento de PYMEs
 Concepto: OBLIGACIÓN → CUOTAS → FINANCIAMIENTO → PAGO → CANCELACIÓN. **No se renombra el contrato ni sus campos** (`seller`, `buyer`): en la UI se presentan como *acreedor/inversor* (`seller`, quien cobra y crea la obligación) y *deudor/PYME* (`buyer`, quien paga las cuotas). Motivo: cambiar nombres on-chain obligaría a re-desplegar y regenerar ABI sin aportar valor a la demo. La obligación demo ahora es "Capital de trabajo PYME", 10 × 1.000 USDC (USD 10.000).
