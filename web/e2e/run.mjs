@@ -1,0 +1,505 @@
+// Suite E2E completa (Chromium + wallets simuladas + anvil + RPC Solana simulado).
+// Se corre con scripts/run-local-e2e.sh, que levanta anvil, el mock de Solana y la web.
+import assert from "node:assert/strict";
+import { execFileSync, spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { ACCOUNTS, ANVIL, BASE, REGISTRY, advanceDays, cast, usdcAtaOf, closeBrowser, createObligation, launch, newPage, randomOffCurvePubkey, randomSolanaPubkey, summary, test, text } from "./lib.mjs";
+
+const SHOTS = process.env.E2E_SHOTS_DIR ?? path.resolve(import.meta.dirname, "../../docs/progress/demo");
+fs.mkdirSync(SHOTS, { recursive: true });
+const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name), fullPage: true });
+const statuses = async (page) => (await page.locator('[data-testid="installment-status"]').allInnerTexts()).map((s) => s.trim());
+const goto = (page, p) => page.goto(BASE + p, { waitUntil: "networkidle" });
+const noPageErrors = (page) => assert.deepEqual(page.errors, [], "errores de JS en la página");
+const SELLER_SOL = randomSolanaPubkey();
+
+async function payFirstWithSolana(page, paidAfter, total) {
+  await page.locator('[data-testid="pay-solana"]').first().click();
+  await page.waitForFunction(([n, t]) => document.querySelector('[data-testid="progress"]')?.textContent.replace(/\s/g, "") === `${n}/${t}`,
+    [paidAfter, total], { timeout: 30000 });
+}
+async function fillForm(page, v = {}) {
+  await page.fill("input[name=buyer]", v.buyer ?? ACCOUNTS.pyme);
+  await page.fill("input[name=sellerSolanaAddress]", v.solana ?? SELLER_SOL);
+  await page.fill("input[name=totalUsdc]", v.total ?? "1000");
+  await page.fill("input[name=installmentCount]", v.count ?? "2");
+}
+
+await launch();
+
+// ───────────────────────── 1. Lectura / navegación ─────────────────────────
+console.log("\n[1] Lectura y navegación");
+await test("home lista la obligación demo y enlaza al detalle", async () => {
+  const page = await newPage();
+  await goto(page, "/");
+  assert.ok((await page.locator('[data-testid="obligation-link"]').count()) >= 1);
+  assert.match(await text(page, '[data-testid="obligation-count"]'), /^\d+$/);
+  await page.locator('[data-testid="obligation-link"]').last().click();
+  await page.waitForURL(/\/obligations\/\d+$/);
+  noPageErrors(page);
+});
+await test("detalle explica dónde interviene Monad y Solana", async () => {
+  const page = await newPage();
+  await goto(page, "/obligations/1");
+  const panel = await text(page, '[data-testid="chains-panel"]');
+  assert.match(panel, /Monad — registro verificable/);
+  assert.match(panel, /Solana — riel de pago/);
+});
+await test("/api/health: configuración lista y contrato legible (sin exponer secretos)", async () => {
+  const res = await fetch(`${BASE}/api/health`);
+  const body = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(body));
+  assert.equal(body.ok, true);
+  assert.equal(body.config.verifierKeyConfigured, true);
+  assert.equal(body.config.verifierAddress, ACCOUNTS.seller, "la clave del servidor corresponde al verifier del contrato");
+  assert.equal(body.config.contractVerifier.toLowerCase(), ACCOUNTS.seller.toLowerCase());
+  assert.match(body.obligationCount, /^\d+$/);
+  assert.ok(!JSON.stringify(body).includes("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), "no debe exponer la clave");
+});
+await test("/api/health detecta una clave de verifier equivocada o inválida (503 con el motivo, sin exponer la clave)", async () => {
+  const WRONG = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"; // anvil 2: no es el verifier
+  for (const [key, expected] of [[WRONG, /NO es el verifier del contrato/], ["vacio", /no es una clave privada válida/]]) {
+    const srv = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", "3101"], { cwd: path.resolve(import.meta.dirname, ".."), env: { ...process.env, VERIFIER_PRIVATE_KEY: key }, stdio: "ignore" });
+    try {
+      let body, status;
+      for (let i = 0; i < 40 && !body; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try { const res = await fetch("http://localhost:3101/api/health"); status = res.status; body = await res.json(); } catch {}
+      }
+      assert.ok(body, "la instancia de prueba no arrancó");
+      assert.equal(status, 503, JSON.stringify(body));
+      assert.equal(body.ok, false);
+      assert.match(body.problems.join(" | "), expected);
+      assert.ok(!JSON.stringify(body).includes(key.slice(2)) && !JSON.stringify(body).includes(key), "no debe exponer la clave");
+    } finally { srv.kill("SIGKILL"); }
+  }
+});
+await test("404 para ids inexistentes o inválidos", async () => {
+  const page = await newPage();
+  for (const id of ["999999", "abc", "0", "-1", "1.5"]) assert.equal((await page.goto(`${BASE}/obligations/${id}`)).status(), 404, id);
+});
+await test("detalle en móvil (390px) no desborda horizontalmente la página", async () => {
+  const page = await newPage({ viewport: { width: 390, height: 800 } });
+  await goto(page, "/obligations/1");
+  const [sw, iw] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
+  assert.ok(sw <= iw, `scrollWidth ${sw} > innerWidth ${iw}`);
+  await shot(page, "mobile-detail.png");
+});
+
+// ───────────────────────── 2. DEMO: 10 cuotas pagadas con Solana ─────────────────────────
+console.log("\n[2] DEMO end-to-end: PYME, USD 10.000 en 10 cuotas, pagadas con Solana");
+await test("obligación #1 → 10 cuotas pagadas por Solana → COMPLETED", async () => {
+  const page = await newPage({ evm: { startConnected: false }, phantom: true });
+  await goto(page, "/");
+  await shot(page, "01-home.png");
+  await goto(page, "/obligations/1");
+  assert.equal((await statuses(page)).filter((s) => s === "PENDING").length, 10, "la demo debe partir con 10 PENDING");
+  assert.equal(await text(page, '[data-testid="total-amount"]'), "10.000 USDC");
+  await shot(page, "02-detalle-pendiente.png");
+  await payFirstWithSolana(page, 1, 10);
+  assert.equal((await statuses(page))[0], "PAID");
+  assert.match(await text(page, '[data-testid="outstanding"]'), /^9\.000 USDC$/);
+  assert.equal(await page.locator('[data-testid="payment-ref-link"]').count(), 1, "la ref de Solana enlaza al explorer");
+  await shot(page, "03-cuota-1-pagada.png");
+  for (let n = 2; n <= 10; n++) await payFirstWithSolana(page, n, 10);
+  assert.equal(await text(page, '[data-testid="obligation-status"]'), "COMPLETED");
+  assert.equal((await statuses(page)).filter((s) => s === "PAID").length, 10);
+  assert.equal(await text(page, '[data-testid="outstanding"]'), "0 USDC");
+  assert.equal(await page.evaluate(() => window.__phantomSends), 10, "exactamente 10 pagos en Solana");
+  await shot(page, "04-completada.png");
+  noPageErrors(page);
+});
+await test("PAID/COMPLETED persisten tras recargar (fuente de verdad: Monad)", async () => {
+  const page = await newPage();
+  await goto(page, "/obligations/1");
+  assert.equal(await text(page, '[data-testid="obligation-status"]'), "COMPLETED");
+  assert.equal(await page.locator('[data-testid="pay-solana"]').count(), 0, "sin botones de pago en cuotas pagadas");
+});
+
+// ───────────────────────── 3. Crear obligación ─────────────────────────
+console.log("\n[3] Crear obligación (wallet EVM)");
+await test("formulario crea la obligación y redirige al detalle", async () => {
+  const page = await newPage({ evm: {} });
+  await goto(page, "/obligations/new");
+  assert.equal(await page.isDisabled('[data-testid="submit"]'), true, "submit deshabilitado sin wallet");
+  await page.click('[data-testid="connect-wallet"]');
+  await page.waitForSelector('[data-testid="account"]:has-text("0xf39F")');
+  await fillForm(page, { total: "3000", count: "6" });
+  assert.equal(await page.locator('[data-testid="preview-row"]').count(), 6);
+  await shot(page, "05-nueva-obligacion.png");
+  await page.click('[data-testid="submit"]');
+  await page.waitForURL(/\/obligations\/\d+$/, { timeout: 30000 });
+  assert.equal((await statuses(page)).length, 6);
+  assert.equal(await text(page, '[data-testid="installment-amount"]'), "6 × 500 USDC");
+});
+await test("validación: PYME = acreedor, monto no divisible, cuotas > 60", async () => {
+  const page = await newPage({ evm: {} });
+  await goto(page, "/obligations/new");
+  await page.click('[data-testid="connect-wallet"]');
+  await page.waitForSelector('[data-testid="account"]:has-text("0xf39F")');
+  await fillForm(page, { buyer: ACCOUNTS.seller });
+  assert.match(await text(page, '[data-testid="form-errors"]'), /misma wallet/);
+  await fillForm(page, { total: "10", count: "3" });
+  assert.match(await text(page, '[data-testid="form-errors"]'), /dividirse exacto/);
+  await fillForm(page, { count: "61" });
+  assert.match(await text(page, '[data-testid="form-errors"]'), /entre 1 y 60/);
+  await fillForm(page, { count: "2", solana: randomOffCurvePubkey() });
+  assert.match(await text(page, '[data-testid="form-errors"]'), /PDA\/programa/);
+  assert.equal(await page.isDisabled('[data-testid="submit"]'), true);
+});
+await test("sin wallet instalada: mensaje claro", async () => {
+  const page = await newPage();
+  await goto(page, "/obligations/new");
+  await page.click('[data-testid="connect-wallet"]');
+  assert.match(await text(page, '[data-testid="tx-error"]'), /No se detectó una wallet EVM/);
+});
+await test("el usuario rechaza conectar / firmar → mensaje de rechazo", async () => {
+  let page = await newPage({ evm: { rejectConnect: true } });
+  await goto(page, "/obligations/new");
+  await page.click('[data-testid="connect-wallet"]');
+  assert.match(await text(page, '[data-testid="tx-error"]'), /Rechazaste la operación/);
+  page = await newPage({ evm: { rejectSend: true } });
+  await goto(page, "/obligations/new");
+  await page.click('[data-testid="connect-wallet"]');
+  await page.waitForSelector('[data-testid="account"]:has-text("0xf39F")');
+  await fillForm(page);
+  await page.click('[data-testid="submit"]');
+  await page.waitForSelector('[data-testid="tx-error"]');
+  assert.match(await text(page, '[data-testid="tx-error"]'), /Rechazaste la operación/);
+  assert.equal(await page.isDisabled('[data-testid="submit"]'), false, "se puede reintentar");
+});
+await test("red equivocada → pide cambiar de red; red desconocida → la agrega", async () => {
+  for (const [opts, expected] of [[{ wrongChain: true }, "wallet_switchEthereumChain"], [{ wrongChain: true, unknownChain: true }, "wallet_addEthereumChain"]]) {
+    const page = await newPage({ evm: opts });
+    await goto(page, "/obligations/new");
+    await page.click('[data-testid="connect-wallet"]');
+    await page.waitForSelector('[data-testid="account"]:has-text("0xf39F")');
+    await fillForm(page);
+    await page.click('[data-testid="submit"]');
+    await page.waitForURL(/\/obligations\/\d+$/, { timeout: 30000 });
+    assert.ok((await page.evaluate(() => window.__evmCalls)).includes(expected), expected);
+  }
+});
+
+// ───────────────────────── 4. Pago manual del acreedor ─────────────────────────
+console.log("\n[4] Confirmación manual del acreedor");
+await test("solo el acreedor marca PAID; ref repetida falla; cambio de cuenta; COMPLETED", async () => {
+  const id = createObligation({ description: "E2E manual", solana: SELLER_SOL });
+  const pyme = await newPage({ evm: { account: ACCOUNTS.pyme, startConnected: true } });
+  await goto(pyme, `/obligations/${id}`);
+  await pyme.waitForSelector("text=Solo el acreedor");
+  assert.equal(await pyme.locator('[data-testid="mark-paid"]').count(), 0);
+
+  const page = await newPage({ evm: { startConnected: true } });
+  await goto(page, `/obligations/${id}`);
+  await page.waitForSelector('[data-testid="mark-paid"]');
+  // cambia a la cuenta de la PYME desde la wallet → el botón desaparece; vuelve → reaparece
+  await page.evaluate((a) => window.ethereum.__emit("accountsChanged", [a]), ACCOUNTS.pyme);
+  await page.waitForSelector("text=Solo el acreedor");
+  await page.evaluate((a) => window.ethereum.__emit("accountsChanged", [a]), ACCOUNTS.seller);
+  await page.waitForSelector('[data-testid="mark-paid"]');
+
+  await page.locator('[data-testid="mark-paid"]').first().click();
+  await page.fill('[data-testid="mark-paid-ref"]', `manual-e2e-${id}-1`);
+  await page.click('[data-testid="mark-paid-confirm"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="progress"]')?.textContent.replace(/\s/g, "") === "1/2");
+  await page.locator('[data-testid="mark-paid"]').first().click();
+  await page.fill('[data-testid="mark-paid-ref"]', `manual-e2e-${id}-1`);
+  await page.click('[data-testid="mark-paid-confirm"]');
+  await page.waitForSelector('[data-testid="mark-paid-error"]');
+  assert.match(await text(page, '[data-testid="mark-paid-error"]'), /ya fue usada/);
+  await page.fill('[data-testid="mark-paid-ref"]', `manual-e2e-${id}-2`);
+  await page.click('[data-testid="mark-paid-confirm"]');
+  await page.waitForSelector('[data-testid="obligation-status"]:has-text("COMPLETED")');
+});
+await test("el acreedor rechaza la firma en la wallet → mensaje y se puede reintentar", async () => {
+  const id = createObligation({ description: "E2E rechazo", solana: SELLER_SOL });
+  const page = await newPage({ evm: { startConnected: true, rejectSend: true } });
+  await goto(page, `/obligations/${id}`);
+  await page.waitForSelector('[data-testid="mark-paid"]');
+  await page.locator('[data-testid="mark-paid"]').first().click();
+  await page.click('[data-testid="mark-paid-confirm"]');
+  await page.waitForSelector('[data-testid="mark-paid-error"]');
+  assert.match(await text(page, '[data-testid="mark-paid-error"]'), /Rechazaste la operación/);
+  assert.equal(await page.isDisabled('[data-testid="mark-paid-confirm"]'), false);
+});
+
+// ───────────────────────── 4b. Cesión de pagarés ─────────────────────────
+console.log("\n[4b] Cesión de pagarés a un tercero");
+const CAROL_SOL = randomSolanaPubkey();
+const creditors = async (page) => (await page.locator('[data-testid="installment-creditor"]').all()).length && page.locator('[data-testid="installment-creditor"]').evaluateAll((els) => els.map((e) => e.getAttribute("title").toLowerCase()));
+await test("el proveedor cede pagarés; solo él puede; validaciones; el deudor no puede ser acreedor", async () => {
+  const id = createObligation({ description: "E2E cesión", solana: SELLER_SOL, count: 4, unit: 500_000_000 });
+  // deudor y terceros NO ven la opción de ceder
+  for (const account of [ACCOUNTS.pyme, ACCOUNTS.carol]) {
+    const other = await newPage({ evm: { account, startConnected: true } });
+    await goto(other, `/obligations/${id}`);
+    await other.waitForSelector("text=Solo el acreedor");
+    assert.equal(await other.locator('[data-testid="cede-select"]').count(), 0);
+    assert.equal(await other.locator('[data-testid="cede-panel"]').count(), 0);
+  }
+  const page = await newPage({ evm: { startConnected: true } });
+  await goto(page, `/obligations/${id}`);
+  await page.waitForSelector('[data-testid="cede-select"]');
+  assert.equal(await page.locator('[data-testid="cede-select"]').count(), 4);
+  assert.equal(await page.isDisabled('[data-testid="cede-submit"]'), true, "sin selección no se puede ceder");
+  await page.locator('[data-testid="cede-select"]').nth(2).check();
+  await page.locator('[data-testid="cede-select"]').nth(3).check();
+  // validaciones
+  await page.fill("input[name=newCreditor]", ACCOUNTS.pyme);
+  assert.match(await text(page, '[data-testid="cede-problems"]'), /no puede ser el deudor/);
+  await page.fill("input[name=newCreditor]", ACCOUNTS.seller);
+  assert.match(await text(page, '[data-testid="cede-problems"]'), /no puede ser vos mismo/);
+  await page.fill("input[name=newCreditor]", ACCOUNTS.carol);
+  await page.fill("input[name=newCreditorSolana]", randomOffCurvePubkey());
+  assert.match(await text(page, '[data-testid="cede-problems"]'), /wallet válida/);
+  assert.equal(await page.isDisabled('[data-testid="cede-submit"]'), true);
+  await page.fill("input[name=newCreditorSolana]", CAROL_SOL);
+  await shot(page, "07-ceder-pagares.png");
+  await page.click('[data-testid="cede-submit"]');
+  await page.waitForSelector('[data-testid="cede-done"]');
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="ceded-badge"]').length === 2);
+  const c = await creditors(page);
+  assert.deepEqual(c, [ACCOUNTS.seller, ACCOUNTS.seller, ACCOUNTS.carol, ACCOUNTS.carol].map((a) => a.toLowerCase()));
+  // el proveedor original ya no puede cobrar manualmente las cedidas: solo ve acciones en 1 y 2
+  assert.equal(await page.locator('[data-testid="mark-paid"]').count(), 2);
+  assert.equal(await page.locator('[data-testid="cede-select"]').count(), 2);
+  await shot(page, "08-pagares-cedidos.png");
+  // on-chain: el contrato lo confirma
+  assert.match(cast("call", REGISTRY, "getObligationsByCreditor(address)(uint256[])", ACCOUNTS.carol, "--rpc-url", ANVIL), new RegExp(`\\b${id}\\b`));
+});
+await test("el nuevo acreedor ve sus pagarés, los cobra manualmente y 'Mis pagarés' muestra cada rol", async () => {
+  const id = createObligation({ description: "E2E cesión 2", solana: SELLER_SOL, count: 3 });
+  cast("send", REGISTRY, "transferInstallments(uint256,uint8[],address,string)", id, "[2,3]", ACCOUNTS.carol, CAROL_SOL, "--private-key", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", "--rpc-url", ANVIL);
+  const carol = await newPage({ evm: { account: ACCOUNTS.carol, startConnected: true } });
+  await goto(carol, `/obligations/${id}`);
+  await carol.waitForSelector('[data-testid="cede-select"]');
+  assert.equal(await carol.locator('[data-testid="cede-select"]').count(), 2, "Carol puede ceder 2 y 3");
+  assert.equal(await carol.locator('[data-testid="mark-paid"]').count(), 2);
+  await carol.locator('[data-testid="mark-paid"]').first().click();
+  await carol.fill('[data-testid="mark-paid-ref"]', `manual-carol-${id}-2`);
+  await carol.click('[data-testid="mark-paid-confirm"]');
+  await carol.waitForFunction(() => document.querySelectorAll('[data-testid="installment-status"]')[1]?.textContent.trim() === "PAID");
+  // Mis pagarés (home) por rol
+  const roleOf = async (account) => {
+    const p = await newPage({ evm: { account, startConnected: true } });
+    await goto(p, "/");
+    await p.waitForSelector('[data-testid="my-obligation-link"]');
+    return p.locator(`[data-testid="my-obligation-link"]:has-text("Obligación #${id}")`).locator('[data-testid="my-role"]').allInnerTexts();
+  };
+  assert.ok((await roleOf(ACCOUNTS.carol)).includes("Acreedor por cesión"));
+  assert.ok((await roleOf(ACCOUNTS.seller)).includes("Proveedor (creaste)"));
+  assert.ok((await roleOf(ACCOUNTS.pyme)).includes("Deudor (pagás vos)"));
+});
+await test("el deudor paga un pagaré cedido: va a la cuenta del NUEVO acreedor; pagar a la del anterior se rechaza", async () => {
+  const id = createObligation({ description: "E2E cesión pago", solana: SELLER_SOL, count: 3 });
+  cast("send", REGISTRY, "transferInstallments(uint256,uint8[],address,string)", id, "[2,3]", ACCOUNTS.carol, CAROL_SOL, "--private-key", "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", "--rpc-url", ANVIL);
+  // 1) pago correcto del pagaré 2: el cliente arma la tx hacia la ATA de Carol y el servidor la valida contra el contrato
+  const ok = await newPage({ phantom: true });
+  await goto(ok, `/obligations/${id}`);
+  await ok.locator('[data-testid="pay-solana"]').nth(1).click(); // fila del pagaré 2
+  await ok.waitForFunction(() => document.querySelectorAll('[data-testid="installment-status"]')[1]?.textContent.trim() === "PAID", null, { timeout: 30000 });
+  // 2) pago del pagaré 3 mandado a la cuenta del acreedor ANTERIOR (p. ej. se pagó justo antes de la cesión): rechazado, no se marca PAID
+  const stale = await newPage({ phantom: { destinationOverride: usdcAtaOf(SELLER_SOL) } });
+  await goto(stale, `/obligations/${id}`);
+  await stale.locator('[data-testid="pay-solana"]').nth(1).click(); // ahora la 2ª fila impaga es el pagaré 3
+  await stale.waitForSelector('[data-testid="confirm-error"]', { timeout: 30000 });
+  assert.match(await text(stale, '[data-testid="confirm-error"]'), /destino|transferencia/i);
+  await goto(stale, `/obligations/${id}`);
+  assert.deepEqual(await statuses(stale), ["PENDING", "PAID", "PENDING"]);
+});
+
+// ───────────────────────── 5. Pago Solana: casos de error ─────────────────────────
+console.log("\n[5] Pago con Solana: errores y manipulaciones");
+const solErr = async (page, label = "") => {
+  await page.locator('[data-testid="pay-solana"]').first().click();
+  try { await page.waitForSelector('[data-testid="pay-solana-error"]', { timeout: 8000 }); }
+  catch { throw new Error(`[${label}] no apareció pay-solana-error; envíos a Phantom: ${await page.evaluate(() => window.__phantomSends)}; fila: ` + + (await text(page, "tbody tr")).slice(0, 120) + " | JS: " + page.errors.join(";")); }
+  return text(page, '[data-testid="pay-solana-error"]');
+};
+await test("sin Phantom / usuario rechaza / sin saldo / acreedor inválido", async () => {
+  const id = createObligation({ description: "E2E solana errores", solana: SELLER_SOL });
+  let page = await newPage();
+  await goto(page, `/obligations/${id}`);
+  assert.match(await solErr(page, "sin-phantom"), /No se detectó Phantom/);
+  page = await newPage({ phantom: { rejectConnect: true } });
+  await goto(page, `/obligations/${id}`);
+  assert.match(await solErr(page, "rechaza-connect"), /Rechazaste la operación en Phantom/);
+  page = await newPage({ phantom: { rejectSend: true } });
+  await goto(page, `/obligations/${id}`);
+  assert.match(await solErr(page, "rechaza-send"), /Rechazaste la operación en Phantom/);
+  page = await newPage({ phantom: true, solBalance: "1" });
+  await goto(page, `/obligations/${id}`);
+  assert.match(await solErr(page, "sin-saldo"), /Saldo de USDC devnet insuficiente/);
+  const bad = createObligation({ description: "E2E acreedor fuera de curva", solana: randomOffCurvePubkey() });
+  page = await newPage({ phantom: true });
+  await goto(page, `/obligations/${bad}`);
+  assert.match(await solErr(page, "acreedor-invalido"), /no es una wallet válida/);
+  assert.equal(await page.evaluate(() => window.__phantomSends), 0, "no se envió ningún pago");
+});
+for (const [name, opts, re] of [
+  ["pago por monto menor al de la cuota → el servidor lo rechaza, cuota sigue PENDING", { amountDelta: 1 }, /monto/],
+  ["memo de otra cuota → el servidor lo rechaza, cuota sigue PENDING", { memoOverride: "cuotas:1:99" }, /memo/],
+]) {
+  await test(name, async () => {
+    const id = createObligation({ description: "E2E manipulación", solana: SELLER_SOL });
+    const page = await newPage({ phantom: opts });
+    await goto(page, `/obligations/${id}`);
+    await page.locator('[data-testid="pay-solana"]').first().click();
+    await page.waitForSelector('[data-testid="confirm-error"]', { timeout: 30000 });
+    assert.match(await text(page, '[data-testid="confirm-error"]'), re);
+    assert.equal(await page.evaluate(() => window.__phantomSends), 1);
+    await page.click('[data-testid="retry-verify"]');
+    await page.waitForSelector('[data-testid="confirm-error"]');
+    assert.equal(await page.evaluate(() => window.__phantomSends), 1, "reintentar la verificación NO vuelve a cobrar");
+    await goto(page, `/obligations/${id}`);
+    assert.deepEqual(await statuses(page), ["PENDING", "PENDING"]);
+  });
+}
+await test("falla transitoria del servidor → 'Reintentar verificación' completa sin cobrar dos veces", async () => {
+  const id = createObligation({ description: "E2E reintento", solana: SELLER_SOL });
+  const page = await newPage({ phantom: true });
+  let calls = 0;
+  await page.route("**/api/payments/confirm", (route) => (calls++ === 0
+    ? route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "fallo transitorio" }) })
+    : route.continue()));
+  await goto(page, `/obligations/${id}`);
+  await page.locator('[data-testid="pay-solana"]').first().click();
+  await page.waitForSelector('[data-testid="confirm-error"]');
+  assert.match(await text(page, '[data-testid="confirm-error"]'), /fallo transitorio/);
+  await page.click('[data-testid="retry-verify"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="progress"]')?.textContent.replace(/\s/g, "") === "1/2", null, { timeout: 30000 });
+  assert.equal(await page.evaluate(() => window.__phantomSends), 1);
+});
+await test("endpoint: 400/404/409/422 y rate limit 429 vía HTTP real", async () => {
+  const post = (b) => fetch(`${BASE}/api/payments/confirm`, { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": "10.9.9.9" }, body: typeof b === "string" ? b : JSON.stringify(b) });
+  assert.equal((await post("no-json")).status, 400);
+  assert.equal((await post({ obligationId: "1", number: 1, signature: "x" })).status, 400);
+  assert.equal((await post({ obligationId: "999999", number: 1, signature: "7".repeat(88) })).status, 404);
+  assert.equal((await post({ obligationId: "1", number: 1, signature: "7".repeat(88) })).status, 409, "cuota ya pagada");
+  let last;
+  for (let i = 0; i < 40; i++) last = (await post({ obligationId: "1", number: 1, signature: "7".repeat(88) })).status;
+  assert.equal(last, 429, "rate limit tras 30 pedidos/min por IP");
+});
+
+await test("CLI pay:devnet: bytes firmados reales → RPC → verificador → PAID (sin navegador)", async () => {
+  const id = createObligation({ description: "E2E CLI", solana: SELLER_SOL });
+  const kp = path.join(os.tmpdir(), `finvia-e2e-payer-${process.pid}.json`);
+  fs.writeFileSync(kp, execFileSync("node", ["-e", 'const k=require("@solana/web3.js").Keypair.generate();console.log(JSON.stringify(Array.from(k.secretKey)))'], { encoding: "utf8" }));
+  const out = execFileSync("npx", ["tsx", "scripts/pay-devnet.mts", "--keypair", kp, "--obligation", id, "--number", "1", "--confirm", BASE],
+    { encoding: "utf8", env: { ...process.env, SOLANA_RPC_URL: "http://127.0.0.1:8899" } });
+  fs.rmSync(kp);
+  assert.match(out, /Confirmada en Solana/);
+  assert.match(out, /confirm intento 1: HTTP 200/);
+  const page = await newPage();
+  await goto(page, `/obligations/${id}`);
+  assert.deepEqual(await statuses(page), ["PAID", "PENDING"]);
+  assert.equal(await page.locator('[data-testid="payment-ref-link"]').count(), 1);
+});
+
+// ───────────────────────── 5b. Herramientas del owner ─────────────────────────
+console.log("\n[5b] Verifier dedicado: generador de wallet y pantalla del owner");
+const ACCT2 = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"; // anvil 2
+const verifierOnChain = () => execFileSync("cast", ["call", REGISTRY, "verifier()(address)", "--rpc-url", ANVIL], { encoding: "utf8" }).trim();
+await test("verifier:new genera la wallet SIN imprimir la clave, y no la sobrescribe", async () => {
+  const file = path.join(os.tmpdir(), `finvia-verifier-${process.pid}.key`);
+  fs.rmSync(file, { force: true });
+  const run = (...a) => execFileSync("npx", ["tsx", "scripts/new-verifier.mts", ...a], { encoding: "utf8", env: { ...process.env, VERIFIER_KEY_FILE: file } });
+  const out = run();
+  const key = fs.readFileSync(file, "utf8").trim();
+  assert.match(key, /^0x[0-9a-f]{64}$/);
+  assert.ok(!out.includes(key.slice(2)), "la clave NO debe imprimirse");
+  const addr = out.match(/0x[0-9a-fA-F]{40}/)[0];
+  const again = run();
+  assert.equal(fs.readFileSync(file, "utf8").trim(), key, "no sobrescribe");
+  assert.ok(again.includes(addr) && !again.includes(key.slice(2)));
+  fs.rmSync(file);
+});
+await test("solana:new genera el keypair SIN imprimir la clave, es usable por pay:devnet y no se sobrescribe", async () => {
+  const file = path.join(os.tmpdir(), `finvia-solana-${process.pid}.json`);
+  fs.rmSync(file, { force: true });
+  const run = () => execFileSync("npx", ["tsx", "scripts/new-solana-wallet.mts", "--out", file], { encoding: "utf8" });
+  const out = run();
+  const secret = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.equal(secret.length, 64);
+  assert.ok(!out.includes(secret.join(",")) && !out.includes(JSON.stringify(secret)), "la clave NO debe imprimirse");
+  const pub = out.match(/Direcci[oó]n p[uú]blica[^:]*: ([1-9A-HJ-NP-Za-km-z]{32,44})/)[1];
+  assert.equal(run().includes(pub), true, "segunda corrida: misma dirección, sin sobrescribir");
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), secret);
+  fs.rmSync(file);
+});
+await test("/admin/verifier: el owner cambia el verifier firmando con su wallet; un no-owner es rechazado", async () => {
+  const notOwner = await newPage({ evm: { account: ACCOUNTS.pyme } });
+  await goto(notOwner, "/admin/verifier");
+  await notOwner.click('[data-testid="connect"]');
+  await notOwner.waitForSelector('[data-testid="connected"]:has-text("NO es el owner")');
+  await notOwner.fill("input[name=newVerifier]", ACCT2);
+  await notOwner.click('[data-testid="set-verifier"]');
+  await notOwner.waitForSelector('[data-testid="owner-error"]');
+  assert.match(await text(notOwner, '[data-testid="owner-error"]'), /Solo el owner/);
+  assert.equal(verifierOnChain().toLowerCase(), ACCOUNTS.seller.toLowerCase(), "el verifier no debe cambiar");
+
+  const page = await newPage({ evm: {} });
+  await goto(page, "/admin/verifier");
+  assert.equal((await text(page, '[data-testid="owner"]')).toLowerCase(), ACCOUNTS.seller.toLowerCase());
+  await page.click('[data-testid="connect"]');
+  await page.waitForSelector('[data-testid="connected"]:has-text("owner ✓")');
+  await page.fill("input[name=newVerifier]", "0x123");
+  assert.equal(await page.isDisabled('[data-testid="set-verifier"]'), true, "dirección inválida");
+  await page.fill("input[name=newVerifier]", ACCOUNTS.seller);
+  await page.waitForSelector('[data-testid="same-as-owner"]');
+  await page.fill("input[name=newVerifier]", ACCT2);
+  await page.click('[data-testid="set-verifier"]');
+  await page.waitForSelector('[data-testid="owner-done"]');
+  assert.equal(verifierOnChain().toLowerCase(), ACCT2.toLowerCase());
+  assert.equal((await text(page, '[data-testid="verifier"]')).toLowerCase(), ACCT2.toLowerCase());
+  // restaurar para no romper el resto de la batería (el servidor firma con la cuenta 0)
+  await page.fill("input[name=newVerifier]", ACCOUNTS.seller);
+  await page.click('[data-testid="set-verifier"]');
+  await page.waitForFunction((a) => document.querySelector('[data-testid="verifier"]')?.textContent.toLowerCase() === a.toLowerCase(), ACCOUNTS.seller);
+  assert.equal(verifierOnChain().toLowerCase(), ACCOUNTS.seller.toLowerCase());
+});
+
+await test("/admin/deploy: despliega el contrato firmando con la wallet; el owner es quien firma", async () => {
+  const page = await newPage({ evm: {} });
+  await goto(page, "/admin/deploy");
+  await page.click('[data-testid="connect"]');
+  await page.waitForSelector('[data-testid="connected"]');
+  assert.equal(await page.isDisabled('[data-testid="deploy"]'), true);
+  await page.fill("input[name=verifier]", "0x123");
+  await page.waitForSelector('[data-testid="invalid"]');
+  await page.fill("input[name=verifier]", ACCOUNTS.seller);
+  await page.waitForSelector('[data-testid="same-as-owner"]');
+  await page.fill("input[name=verifier]", ACCT2);
+  await page.click('[data-testid="deploy"]');
+  await page.waitForSelector('[data-testid="deployed-address"]', { timeout: 30000 });
+  const addr = await text(page, '[data-testid="deployed-address"]');
+  const call = (fn) => cast("call", addr, fn, "--rpc-url", ANVIL).toLowerCase();
+  assert.equal(call("owner()(address)"), ACCOUNTS.seller.toLowerCase());
+  assert.equal(call("verifier()(address)"), ACCT2.toLowerCase());
+  assert.match(call("obligationCount()(uint256)"), /^0/);
+  cast("call", addr, "getObligationsByCreditor(address)(uint256[])", ACCOUNTS.carol, "--rpc-url", ANVIL); // incluye la cesión
+});
+
+// ───────────────────────── 6. OVERDUE (viaje en el tiempo, va al final) ─────────────────────────
+console.log("\n[6] Vencimientos (OVERDUE derivado del tiempo)");
+await test("cuota vencida se muestra OVERDUE y aun así se puede pagar", async () => {
+  const id = createObligation({ description: "E2E vencida", solana: SELLER_SOL, firstDueInDays: 5, count: 2, intervalDays: 30 });
+  const page = await newPage({ evm: { startConnected: true }, phantom: true });
+  await goto(page, `/obligations/${id}`);
+  assert.deepEqual(await statuses(page), ["PENDING", "PENDING"]);
+  assert.equal(await text(page, '[data-testid="overdue-count"]'), "0");
+  advanceDays(6);
+  await goto(page, `/obligations/${id}`);
+  assert.deepEqual(await statuses(page), ["OVERDUE", "PENDING"]);
+  assert.equal(await text(page, '[data-testid="overdue-count"]'), "1");
+  await shot(page, "06-cuota-vencida.png");
+  await payFirstWithSolana(page, 1, 2);
+  assert.deepEqual(await statuses(page), ["PAID", "PENDING"]);
+  assert.equal(await text(page, '[data-testid="overdue-count"]'), "0");
+});
+
+await closeBrowser();
+process.exit(summary() ? 0 : 1);

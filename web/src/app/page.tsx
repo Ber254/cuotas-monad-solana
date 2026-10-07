@@ -1,25 +1,40 @@
+import Link from "next/link";
+import { MyObligations } from "@/components/MyObligations";
+import { StatusBadge } from "@/components/StatusBadge";
+import { formatUsdc } from "@/lib/format";
 import { chain, registryAddress, rpcUrl } from "@/lib/monad";
-import { getObligationCount } from "@/lib/registry";
+import { getObligation, getObligationCount, type Obligation } from "@/lib/registry";
 
 export const dynamic = "force-dynamic";
 
-async function readCount(): Promise<string> {
-  if (!registryAddress) return "contrato no configurado";
+/** Cuántas obligaciones (las más recientes) se listan en la home. */
+const LIST_LIMIT = BigInt(50);
+
+type HomeData = { count: string; obligations: Obligation[]; error?: string };
+
+async function readData(): Promise<HomeData> {
+  if (!registryAddress) return { count: "contrato no configurado", obligations: [] };
   try {
-    return (await getObligationCount()).toString();
+    const count = await getObligationCount();
+    const ids: bigint[] = [];
+    for (let id = count; id > BigInt(0) && id > count - LIST_LIMIT; id--) ids.push(id);
+    const obligations = await Promise.all(ids.map((id) => getObligation(id)));
+    return { count: count.toString(), obligations };
   } catch (e) {
-    return `error leyendo el contrato: ${(e as Error).message.split("\n")[0]}`;
+    const msg = `error leyendo el contrato: ${(e as Error).message.split("\n")[0]}`;
+    return { count: msg, obligations: [], error: msg };
   }
 }
 
 export default async function Home() {
-  const count = await readCount();
+  const { count, obligations } = await readData();
   return (
-    <main className="mx-auto max-w-2xl p-8 space-y-6">
-      <h1 className="text-3xl font-bold">Cuotas</h1>
+    <main className="mx-auto max-w-3xl p-4 sm:p-8 space-y-6">
+      <h1 className="text-3xl font-bold">Finvia</h1>
       <p>
-        Obligaciones de pago en cuotas registradas en <b>Monad</b>, con pago de cada cuota en{" "}
-        <b>USDC sobre Solana</b>.
+        Financiamiento de proveedores para PYMEs: el proveedor vende a crédito y la PYME firma pagarés (cuotas)
+        registrados en <b>Monad</b> (fuente de verdad verificable). Cada pagaré se paga en <b>USDC sobre Solana</b> y
+        el proveedor puede <b>ceder</b> pagarés a un tercero.
       </p>
       <section className="rounded border border-white/15 p-4 text-sm space-y-1" data-testid="config">
         <div>Red: {chain.name} (chainId {chain.id})</div>
@@ -29,8 +44,43 @@ export default async function Home() {
           Obligaciones registradas: <span data-testid="obligation-count">{count}</span>
         </div>
       </section>
+
+      <MyObligations />
+
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Obligaciones</h2>
+          <Link href="/obligations/new" className="rounded bg-green-600 px-3 py-1 text-sm font-semibold" data-testid="new-obligation">
+            + Nueva obligación
+          </Link>
+        </div>
+        {obligations.length === 0 ? (
+          <p className="text-sm text-white/60">Todavía no hay obligaciones.</p>
+        ) : (
+          <ul className="divide-y divide-white/10 rounded border border-white/15">
+            {obligations.map((o) => (
+              <li key={o.id.toString()}>
+                <Link
+                  href={`/obligations/${o.id}`}
+                  className="flex items-center justify-between gap-4 p-3 hover:bg-white/5"
+                  data-testid="obligation-link"
+                >
+                  <span>
+                    Obligación #{o.id.toString()} — {o.description}
+                  </span>
+                  <span className="flex items-center gap-3 text-sm text-white/70">
+                    {formatUsdc(o.installmentAmount * BigInt(o.installmentCount))} USDC · {o.paidCount}/
+                    {o.installmentCount}
+                    <StatusBadge status={o.status} />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <p className="text-sm text-white/60">
-        Base del MVP. Estado y próxima tarea en <code>docs/progress/</code>.
+        MVP de hackathon. Estado y próxima tarea en <code>docs/progress/</code>.
       </p>
     </main>
   );

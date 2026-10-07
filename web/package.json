@@ -6,9 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:create": "tsx scripts/test-create-flow.mts",
+    "test:solana": "tsx scripts/test-solana-tx.mts",
+    "test:verify": "tsx scripts/test-verify-payment.mts",
+    "test:onchain": "tsx scripts/test-verifier-onchain.mts",
+    "test:e2e": "../scripts/run-local-e2e.sh",
+    "check:deploy": "node scripts/check-deploy.mjs",
+    "real:preflight": "tsx scripts/real-network-check.mts preflight",
+    "real:tx": "tsx scripts/real-network-check.mts tx",
+    "pay:devnet": "tsx scripts/pay-devnet.mts",
+    "verifier:new": "tsx scripts/new-verifier.mts",
+    "solana:new": "tsx scripts/new-solana-wallet.mts"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
     "next": "15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -22,7 +35,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.27",
+    "playwright-core": "^1.63.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

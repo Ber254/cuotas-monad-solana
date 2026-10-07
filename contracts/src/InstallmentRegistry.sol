@@ -4,7 +4,8 @@ pragma solidity ^0.8.28;
 /// @title InstallmentRegistry
 /// @notice Registro on-chain (Monad) de obligaciones de pago en cuotas.
 ///         No custodia fondos: el pago real ocurre en Solana (USDC) y un
-///         `verifier` (o el vendedor) lo registra acá como PAID.
+///         `verifier` (o el acreedor del pagaré) lo registra acá como PAID.
+///         Cada cuota es un pagaré cuyo acreedor puede cederse a un tercero (`transferInstallments`).
 contract InstallmentRegistry {
     enum InstallmentStatus {
         PENDING,
@@ -44,6 +45,10 @@ contract InstallmentRegistry {
         uint64 paidAt;
         /// Referencia del pago (firma de la tx en Solana).
         string paymentRef;
+        /// Acreedor actual si el pagaré fue cedido; address(0) = el vendedor original (ahorra gas al crear).
+        address creditor;
+        /// Cuenta Solana donde cobra el acreedor cedido; vacío = la del vendedor original.
+        string creditorSolanaAddress;
     }
 
     /// Vista de una cuota con estado derivado y partes de la obligación.
@@ -56,7 +61,12 @@ contract InstallmentRegistry {
         uint64 paidAt;
         string paymentRef;
         address buyer;
+        /// Vendedor original que creó la obligación.
         address seller;
+        /// Acreedor ACTUAL del pagaré (= seller salvo que se haya cedido).
+        address creditor;
+        /// Cuenta Solana donde debe pagarse ESTE pagaré (la del acreedor actual).
+        string creditorSolanaAddress;
     }
 
     uint8 public constant MAX_INSTALLMENTS = 60;
@@ -70,6 +80,9 @@ contract InstallmentRegistry {
     mapping(bytes32 => bool) public usedPaymentRefs;
     mapping(address => uint256[]) private _byBuyer;
     mapping(address => uint256[]) private _bySeller;
+    /// Obligaciones donde la dirección recibió algún pagaré por cesión (puede haberlo vuelto a ceder).
+    mapping(address => uint256[]) private _byCreditor;
+    mapping(address => mapping(uint256 => bool)) private _creditorSeen;
 
     event ObligationCreated(
         uint256 indexed obligationId,
@@ -81,6 +94,9 @@ contract InstallmentRegistry {
         uint64 interval
     );
     event InstallmentPaid(uint256 indexed obligationId, uint8 indexed number, string paymentRef, address markedBy);
+    event InstallmentTransferred(
+        uint256 indexed obligationId, uint8 indexed number, address indexed to, address from, string toSolanaAddress
+    );
     event ObligationCompleted(uint256 indexed obligationId);
     event VerifierChanged(address indexed previous, address indexed current);
 
@@ -148,7 +164,9 @@ contract InstallmentRegistry {
                 dueDate: firstDueDate + uint64(n - 1) * interval,
                 paid: false,
                 paidAt: 0,
-                paymentRef: ""
+                paymentRef: "",
+                creditor: address(0),
+                creditorSolanaAddress: ""
             });
         }
 
@@ -161,15 +179,15 @@ contract InstallmentRegistry {
     }
 
     /// @notice Marca una cuota como pagada. Solo `verifier` (confirmación del pago
-    ///         en Solana) o el vendedor de la obligación (confirmación manual).
+    ///         en Solana) o el ACREEDOR ACTUAL de ese pagaré (confirmación manual).
     function markInstallmentPaid(uint256 obligationId, uint8 number, string calldata paymentRef) external {
         Obligation storage o = _obligations[obligationId];
         if (o.id == 0) revert ObligationNotFound();
-        if (msg.sender != verifier && msg.sender != o.seller) revert NotAuthorized();
         if (number == 0 || number > o.installmentCount) revert InstallmentNotFound();
-        if (bytes(paymentRef).length == 0) revert InvalidParams();
-
         Installment storage inst = _installments[obligationId][number];
+        // Solo el verifier o el ACREEDOR ACTUAL de este pagaré (si fue cedido, ya no el vendedor original).
+        if (msg.sender != verifier && msg.sender != _creditorOf(o, inst)) revert NotAuthorized();
+        if (bytes(paymentRef).length == 0) revert InvalidParams();
         if (inst.paid) revert AlreadyPaid();
 
         bytes32 refHash = keccak256(bytes(paymentRef));
@@ -186,6 +204,39 @@ contract InstallmentRegistry {
         if (o.paidCount == o.installmentCount) {
             o.status = ObligationStatus.COMPLETED;
             emit ObligationCompleted(obligationId);
+        }
+    }
+
+    /// @notice Cede pagarés (cuotas impagas) de los que sos acreedor a otra dirección. El comprador (deudor)
+    ///         no puede ser acreedor de su propia deuda. El acuerdo comercial (precio de la cesión) es off-chain.
+    ///         Desde la cesión, el pago debe hacerse a `newCreditorSolanaAddress`.
+    function transferInstallments(
+        uint256 obligationId,
+        uint8[] calldata numbers,
+        address newCreditor,
+        string calldata newCreditorSolanaAddress
+    ) external {
+        Obligation storage o = _obligations[obligationId];
+        if (o.id == 0) revert ObligationNotFound();
+        if (
+            numbers.length == 0 || numbers.length > MAX_INSTALLMENTS || newCreditor == address(0)
+                || newCreditor == o.buyer || bytes(newCreditorSolanaAddress).length == 0
+        ) revert InvalidParams();
+        for (uint256 i = 0; i < numbers.length; i++) {
+            uint8 n = numbers[i];
+            if (n == 0 || n > o.installmentCount) revert InstallmentNotFound();
+            Installment storage inst = _installments[obligationId][n];
+            if (inst.paid) revert AlreadyPaid();
+            address from = _creditorOf(o, inst);
+            if (from != msg.sender) revert NotAuthorized();
+            if (newCreditor == from) revert InvalidParams();
+            inst.creditor = newCreditor;
+            inst.creditorSolanaAddress = newCreditorSolanaAddress;
+            emit InstallmentTransferred(obligationId, n, newCreditor, from, newCreditorSolanaAddress);
+        }
+        if (!_creditorSeen[newCreditor][obligationId]) {
+            _creditorSeen[newCreditor][obligationId] = true;
+            _byCreditor[newCreditor].push(obligationId);
         }
     }
 
@@ -209,7 +260,11 @@ contract InstallmentRegistry {
             paidAt: inst.paidAt,
             paymentRef: inst.paymentRef,
             buyer: o.buyer,
-            seller: o.seller
+            seller: o.seller,
+            creditor: _creditorOf(o, inst),
+            creditorSolanaAddress: bytes(inst.creditorSolanaAddress).length == 0
+                ? o.sellerSolanaAddress
+                : inst.creditorSolanaAddress
         });
     }
 
@@ -228,6 +283,15 @@ contract InstallmentRegistry {
 
     function getObligationsBySeller(address seller) external view returns (uint256[] memory) {
         return _bySeller[seller];
+    }
+
+    /// Obligaciones donde `creditor` recibió algún pagaré por cesión (revisar `getInstallments` para ver cuáles tiene hoy).
+    function getObligationsByCreditor(address creditor) external view returns (uint256[] memory) {
+        return _byCreditor[creditor];
+    }
+
+    function _creditorOf(Obligation storage o, Installment storage inst) private view returns (address) {
+        return inst.creditor == address(0) ? o.seller : inst.creditor;
     }
 
     /// OVERDUE se deriva al leer (no se persiste): impaga y vencida.

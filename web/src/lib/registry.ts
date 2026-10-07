@@ -1,4 +1,4 @@
-import type { Address } from "viem";
+import { BaseError, ContractFunctionRevertedError, type Address } from "viem";
 import { installmentRegistryAbi } from "./abi";
 import { publicClient, registryAddress } from "./monad";
 
@@ -8,8 +8,7 @@ export const OBLIGATION_STATUS = ["ACTIVE", "COMPLETED"] as const;
 export type InstallmentStatus = (typeof INSTALLMENT_STATUS)[number];
 export type ObligationStatus = (typeof OBLIGATION_STATUS)[number];
 
-/** USDC usa 6 decimales tanto en Solana como en el contrato. */
-export const USDC_DECIMALS = 6;
+export { USDC_DECIMALS } from "./constants";
 
 function requireAddress(): Address {
   if (!registryAddress) throw new Error("NEXT_PUBLIC_REGISTRY_ADDRESS no está configurada");
@@ -42,4 +41,39 @@ export async function getInstallments(id: bigint) {
     args: [id],
   });
   return list.map((i) => ({ ...i, status: INSTALLMENT_STATUS[i.status] }));
+}
+
+export type Obligation = Awaited<ReturnType<typeof getObligation>>;
+export type InstallmentView = Awaited<ReturnType<typeof getInstallments>>[number];
+
+function isObligationNotFound(e: unknown): boolean {
+  if (!(e instanceof BaseError)) return false;
+  const revert = e.walk((err) => err instanceof ContractFunctionRevertedError);
+  return revert instanceof ContractFunctionRevertedError && revert.data?.errorName === "ObligationNotFound";
+}
+
+/** Obligación + cuotas, o `null` si el contrato revierte con `ObligationNotFound`. */
+export async function findObligationWithInstallments(id: bigint) {
+  try {
+    const [obligation, installments] = await Promise.all([getObligation(id), getInstallments(id)]);
+    return { obligation, installments };
+  } catch (e) {
+    if (isObligationNotFound(e)) return null;
+    throw e;
+  }
+}
+
+export type MyRole = "proveedor" | "deudor" | "acreedor-cedido";
+
+/** Obligaciones donde `who` participa, con su rol (puede tener más de uno). Orden: más recientes primero. */
+export async function getMyObligations(who: Address): Promise<{ id: bigint; roles: MyRole[] }[]> {
+  const read = (functionName: "getObligationsBySeller" | "getObligationsByBuyer" | "getObligationsByCreditor") =>
+    publicClient.readContract({ address: requireAddress(), abi: installmentRegistryAbi, functionName, args: [who] });
+  const [seller, buyer, creditor] = await Promise.all([read("getObligationsBySeller"), read("getObligationsByBuyer"), read("getObligationsByCreditor")]);
+  const roles = new Map<bigint, MyRole[]>();
+  const add = (ids: readonly bigint[], role: MyRole) => ids.forEach((id) => roles.set(id, [...(roles.get(id) ?? []), role]));
+  add(seller, "proveedor");
+  add(buyer, "deudor");
+  add(creditor, "acreedor-cedido");
+  return [...roles.entries()].map(([id, r]) => ({ id, roles: r })).sort((a, b) => (a.id < b.id ? 1 : -1));
 }

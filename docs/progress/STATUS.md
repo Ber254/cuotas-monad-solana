@@ -1,33 +1,89 @@
 # Status
 
-_Última actualización: 2026-10-03 (Devin)._
+_Última actualización: 2026-10-05 (Claude Code, continuando a Devin)._
 
-## Terminado y probado
-- Estructura del repo, documentación de continuidad (`docs/progress/`) y README principal.
-- Modelo de datos de obligación y cuotas (ver `ARCHITECTURE.md`).
-- Contrato `contracts/src/InstallmentRegistry.sol`: crear obligación + generar N cuotas, marcar cuota PAID (verifier o vendedor), OVERDUE derivado por tiempo, COMPLETED automático, anti doble pago y anti reuso de `paymentRef`. **10 tests `forge test` pasando.**
-- Scripts Foundry: `script/Deploy.s.sol`, `script/SeedDemo.s.sol` (obligación demo Celular, 10 × 100 USDC, mensual). Probados contra anvil.
-- `scripts/local-chain-setup.sh`: anvil → deploy → obligación demo → escribe `web/.env.local`. Probado.
-- `web/` Next.js 15 + viem: home lee red/contrato/`obligationCount` desde la cadena. Probado con anvil (muestra `1` después del seed) y contra Monad Testnet (muestra `0`). `lint`, `tsc` y `build` pasan.
-- **Contrato desplegado en Monad Testnet** (ver tabla "Direcciones desplegadas"). Verificado con `cast`: `owner` y `verifier` = wallet del deployer, `obligationCount` = 0.
+## Resumen
+MVP de Finvia **completo y probado en local** (anvil + Chromium con wallets simuladas + RPC de Solana simulado): crear obligación → cuotas → pagar cada cuota en USDC por Solana → el servidor verifica y marca PAID en Monad → obligación COMPLETED. **Lo único sin probar es contra las redes reales** (Solana devnet, Monad Testnet) y con wallets reales (MetaMask, Phantom): desde el entorno de desarrollo ambas redes están bloqueadas (HTTP 403 del proxy; verificado de nuevo el 2026-10-05). Eso es lo primero que hay que hacer con acceso (ver `NEXT_TASK.md`).
 
-## Funcionando
-- Flujo local: anvil + contrato + web leyendo on-chain.
-- Web leyendo el contrato real en Monad Testnet con `NEXT_PUBLIC_CHAIN_ID=10143` y `NEXT_PUBLIC_REGISTRY_ADDRESS` de la tabla.
+## Qué había al empezar (Devin)
+Contrato `InstallmentRegistry` con 10 tests, scripts Foundry, `local-chain-setup.sh`, web Next.js que solo mostraba `obligationCount`, docs de continuidad y deploy en Monad Testnet (`0xF7a6…C321`, sin obligaciones).
 
-## Parcialmente implementado
-- `web/src/lib/registry.ts`: `getObligation` y `getInstallments` existen y tipan, pero ninguna página los usa todavía.
+## Qué se implementó (Claude Code)
+| Etapa | Qué | Cómo se probó | Límite |
+|---|---|---|---|
+| 5 | `/obligations/[id]` (detalle + cuotas + panel "dónde interviene Monad y Solana"), listado en home, rebranding Finvia | E2E + capturas | — |
+| 6 | `/obligations/new`: wallet EVM, validación espejo del contrato (incluye acreedor Solana on-curve), vista previa, `createObligation` | `test:create`, E2E (rechazo 4001, sin wallet, red equivocada/desconocida, validaciones) | MetaMask real no |
+| 7 | Marcar cuota PAID por el acreedor (`MarkPaidButton`), cambio de cuenta (`accountsChanged`) | E2E (solo acreedor, ref repetida, rechazo, COMPLETED) | MetaMask real no |
+| 8 | Pago USDC en Solana vía Phantom: ATA idempotente + `transferChecked` + memo `cuotas:<id>:<n>` | `test:solana` (offline), E2E (Phantom simulado: sin Phantom, rechazo, sin saldo, acreedor fuera de curva) | **Sin tx real en devnet**; mint USDC sin verificar |
+| 9 | `POST /api/payments/confirm` (verificador), rate limit 30/min/IP, "Reintentar verificación" | `test:verify`, `test:onchain` (verificador real vs contrato), E2E (monto menor y memo ajeno rechazados con 422, reintento sin doble cobro, 400/404/409/429) | **`getParsedTransaction` real sin probar** (fixtures según documentación) |
+| 10 | Demo end-to-end ejecutable + guion (`DEMO.md`) + capturas (`docs/progress/demo/`) | E2E: 10 cuotas pagadas por Solana → COMPLETED | Simulada (ver arriba) |
+| 11 | Testing | batería completa `./scripts/run-local-e2e.sh` | — |
+| 12 | Preparación de deploy: `/api/health`, `error.tsx`, timeouts RPC, `runtime/maxDuration`, `check:deploy` (anti-fuga de secretos), guía `DEPLOY.md` | build con config de Testnet; `check:deploy` limpio y con 4 fugas simuladas detectadas; health 503/200; degradación sin RPC (home 200 con error, detalle 500 + pantalla de error, confirm 502); batería completa | **No desplegado en Vercel**; Testnet inalcanzable desde aquí |
+
+## Cómo se prueba todo (un comando)
+```bash
+# desde la raíz; requiere forge/anvil/cast, Node 20+, Chromium (PLAYWRIGHT_BROWSERS_PATH)
+(cd web && npm ci)
+./scripts/run-local-e2e.sh        # contratos + lint + tsc + tests unitarios + build + E2E (21 casos)
+```
+Último resultado (2026-10-05): `forge test` 10/10; lint/tsc/build OK; `test:create`, `test:solana`, `test:verify`, `test:onchain` OK; **E2E 21/21** (con `/api/health` y `pay:devnet`). Variables útiles: `E2E_SKIP_UNIT=1`, `E2E_ONLY=<regex de nombre de test>`. El E2E regenera las capturas de `docs/progress/demo/`.
+
+Cómo funciona la simulación (importante para no confundirla con una prueba real):
+- **EVM**: `window.ethereum` falso que reenvía a anvil (cuentas desbloqueadas). **Phantom**: `window.solana` falso que, al "enviar", registra en `web/scripts/mock-solana-rpc.mts` lo que el *cliente realmente armó* (mint, destino, monto, memo). El servidor consulta ese mock como si fuera Solana y verifica contra los datos del **contrato**. Por eso la tx del cliente y el verificador del servidor quedan contrastados entre sí, pero ninguno contra Solana real.
+
+## Bugs reales hallados y corregidos al probar
+- Una fila por wallet: solo la fila donde se conectaba mostraba "Marcar pagada" (D17).
+- Rechazo del usuario al firmar salía en inglés ("User rejected the request."): viem anida el 4001.
+- Detalle desbordaba en móvil (468px en 390px) y "10" + "1.000" se leían "101.000".
+- **Error mío corregido:** documenté que `1111…1` (system program) no admitía ATA; es falso, **está on-curve** y el pago funcionó. Las que no admiten ATA son direcciones fuera de curva (PDAs). Ahora el formulario rechaza esas al crear la obligación y el pago las rechaza también (y hay tests con una PDA real).
+
+## Herramientas para validar contra redes reales (listas, probadas solo en local)
+`npm run real:preflight` (conectividad, mint, contrato, verifier/saldo/clave), `npm run pay:devnet` (paga una cuota por CLI con keypair: bytes firmados reales → RPC → verificador) y `npm run real:tx` (diagnostica una tx real vs la obligación). Cubiertas en la batería: preflight con clave correcta/equivocada/RPC caído, `real:tx` con pago válido/memo incorrecto/firma inexistente, y `pay:devnet` de punta a punta contra el mock (que decodifica y verifica la firma de los bytes enviados). El verificador ignora instrucciones extra (compute budget, sin parsear) que Phantom pueda agregar (test).
+
+## Validación real en curso (2026-10-06, hecha por el usuario en Windows/PowerShell)
+- ✓ Solana devnet y Monad Testnet alcanzables desde su PC. ✓ `real:preflight`: contrato legible en Testnet (owner = verifier = `0x316A…25dc`, 0 obligaciones, verifier con ~4,8 MON). ✗ → corregido: el mint por defecto no existía (ver abajo).
+- Tip Windows: si Node/PowerShell se cuelgan al conectar (IPv6), `$env:NODE_OPTIONS="--dns-result-order=ipv4first"` en esa ventana; con `curl.exe` funciona sin eso. En PowerShell, pegar los comandos de a uno (o con `;`) y con las direcciones entre comillas.
+
+- ✓ `real:preflight` contra redes reales: mint `4zMMC9sr…ncDU` verificado (SPL Token, 6 decimales). Pendiente: verifier dedicado (herramientas `verifier:new` y `/admin/verifier`, probadas en local), pago real de una cuota.
+
+- ✓ **Verifier dedicado hecho en Monad Testnet (2026-10-06):** `verifier:new` + gas (0,3 MON enviado desde MetaMask) + `setVerifier` con `/admin/verifier` (tx `0x459f60abb80303ad6a6443253a9039104a59559924dfa33739ada66dddb6f5cb`). Contrato: owner `0x316A…25dc`, verifier `0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70`; `real:preflight` ✓ con `VERIFIER_PRIVATE_KEY` cargada desde `web/.verifier-key`. Nota: MetaMask muestra "Monad" (mainnet) y "Monad Testnet" por separado; la de prueba requiere "Mostrar redes de prueba".
+- Siguiente en curso: pagar una cuota real (wallet Solana generada con `npm run solana:new -- --out .solana-payer.json`, SOL devnet de faucet.solana.com y USDC devnet de faucet.circle.com, obligación creada en Testnet con MetaMask, `pay:devnet`).
+
+## Cesión de pagarés (2026-10-06) — implementada y probada en local; **falta redesplegar**
+- El modelo real es **financiamiento de proveedores** (no hay inversor): el proveedor vende a crédito, la PYME firma N pagarés y los paga; el proveedor puede **ceder** pagarés a un tercero (D22). Se corrigió el lenguaje de UI/README/docs.
+- Contrato: `transferInstallments`, `getObligationsByCreditor`, acreedor y cuenta Solana por pagaré (`InstallmentView.creditor`/`creditorSolanaAddress`); `markInstallmentPaid` ahora lo autoriza el acreedor *actual* del pagaré. **Un test de forge encontró un bug mío** (mi parche de `markInstallmentPaid` no se había aplicado y el vendedor original seguía pudiendo marcar cuotas cedidas); corregido y cubierto. `forge test` 16/16.
+- Web: tabla con acreedor por pagaré + badge "cedido", panel para ceder (selección múltiple, validaciones), "Mis pagarés" en la home (proveedor/deudor/acreedor por cesión), pagos y verificación contra el acreedor actual, `/admin/deploy`. E2E 28/28 (incl. pago a la cuenta del acreedor nuevo y rechazo de un pago a la cuenta del anterior). Prueba de mutación hecha: con el verificador roto, el test falla.
+- ✓ **Redesplegado (2026-10-07):** contrato nuevo `0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e` en Monad Testnet (owner = wallet personal, verifier = `0x71fE…cA70`), firmado desde `/admin/deploy`; `real:preflight` ✓ con la clave del verifier. El anterior (`0xF7a6…C321`, sin cesión, 0 obligaciones) quedó obsoleto. `NEXT_PUBLIC_REGISTRY_ADDRESS` actualizado en `.env.example`/DEPLOY/DEMO; **falta** cargarlo en Vercel al publicar.
+- Límites (D22): carrera de pago a la cuenta anterior; sin precio/consentimiento on-chain; cesión irreversible por el cedente; sin auditoría.
+
+## ✓ PRIMER PAGO REAL DE PUNTA A PUNTA (2026-10-07, hecho por el usuario en Windows)
+Evidencia (redes reales: Solana devnet + Monad Testnet), por CLI con `npm run pay:devnet` (misma tx que la UI) y el servidor local como verificador:
+- Contrato `0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e`; **Obligación #1 "Prueba real"** creada desde la UI con MetaMask: proveedor/owner `0x316A…25dc`, deudora `0x8B1D3B84349b33C500f001103597035C6eccb78d` (Account 2), 10 USDC en 2 pagarés de 5, cuenta de cobro Solana `GBSXsTx7fYptB3cMPke52w41SYGSFX81DGp82gLccqBD`.
+- **Pago real en Solana devnet** del pagaré 1 (5 USDC desde `GpkbMzL32d7C3Kguqevq3TEuZGcibbkwpWVS71FfLE44`): firma [`2KmTTuWmACvPVqLzwxEV…`](https://explorer.solana.com/tx/2KmTTuWmACvPVqLzwxEVSkt13LeAQGm1Z9NGBintZGmNXQHVDxAsaD4nFr6v9L5Eb3wwJP83GuDodgvTFxwPkbWH?cluster=devnet) (`2KmTTuWmACvPVqLzwxEVSkt13LeAQGm1Z9NGBintZGmNXQHVDxAsaD4nFr6v9L5Eb3wwJP83GuDodgvTFxwPkbWH`), confirmada.
+- **`/api/payments/confirm` → HTTP 200**: el verificador aceptó la tx REAL (`getParsedTransaction` real, mint USDC de devnet `4zMMC9sr…ncDU`, destino, monto, memo) y registró en Monad Testnet `markInstallmentPaid` firmado por el verifier dedicado: tx [`0xd5154a62d688…`](https://testnet.monadexplorer.com/tx/0xd5154a62d688253ead9941fec9bbd2acab916ef9589e6c65822eeb44d5c1de2e) (`0xd5154a62d688253ead9941fec9bbd2acab916ef9589e6c65822eeb44d5c1de2e`), `paymentRef` = la firma de Solana.
+- **Esto cierra el riesgo principal**: el formato real de Solana coincide con el esperado (no hubo que cambiar `verifyPayment.ts` ni las fixtures).
+- ✓ **CESIÓN REAL (2026-10-07):** con Account 1 (proveedor) se cedió el pagaré 2 desde la UI (panel "Ceder pagarés", firma MetaMask) a Account 3 `0xEdBE8B0bEB8c8C6b0B1E2407fE158a2354e4048d` con cuenta Solana `5m7X7cjMpMHHDQXKBFziREWyEt46r9zxEYSWgsLwihex`; la UI mostró "cedido" y "Solo el acreedor" para el proveedor original. Luego el pago real del pagaré 2 fue **a la cuenta del nuevo acreedor** (no a `GBSX…`): Solana [`3He6Ec1tVSYMj8Ci…`](https://explorer.solana.com/tx/3He6Ec1tVSYMj8CivBUYwaxpiDetYxkjLVYJiKD15gxFNSr6QSMpN7mSYqxC3aW54AL63nQM8Si54QgaWdy82BRS?cluster=devnet) → verificador HTTP 200 → Monad [`0xa74c17120938…`](https://testnet.monadexplorer.com/tx/0xa74c1712093846213cb5e0eebaa5397ab5d8a45763034ec42882f8fb445edd88) → obligación #1 con los 2 pagarés pagados (COMPLETED).
+- ✓ **Cobro confirmado en el explorador de Solana (devnet):** el proveedor original `GBSX…ccqBD` y el nuevo acreedor `5m7X…wihex` tienen 5 USDC cada uno; la UI mostró la obligación #1 en COMPLETED con ambos pagarés PAID.
+- **Todavía NO probado en real:** Phantom y el pago desde el navegador (todos los pagos reales fueron por CLI `pay:devnet`); Vercel.
+
+## 🔐 Incidente y rotación del verifier (2026-10-07)
+- Al cargar la clave en Vercel, la clave privada del verifier (`0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70`) se pegó por error como comando en PowerShell y quedó **impresa en el chat con el asistente**. Se trató como comprometida: se generó un verifier nuevo (`npm run verifier:new -- --force`), se fondeó con 0,3 MON y se asignó con `/admin/verifier` (tx `0x026c603c516ba9403a37bf8051e7b4266f2f0bccb9b2da40324b0b6495b1c7a2`). `real:preflight` ✓: `verifier=0xFb17de8652A857De135d14898712Fe45e4509156`, la clave nueva corresponde, owner distinto.
+- **Verifier vigente: `0xFb17de8652A857De135d14898712Fe45e4509156`.** La clave vieja ya no puede marcar pagos. La nueva existe solo en `web/.verifier-key` (y, cuando se publique, en Vercel como variable Sensitive); nunca debe pegarse en una terminal ni en un chat.
+- Lecciones: (1) copiar con `Get-Content .verifier-key | Set-Clipboard` y pegar **solo** en el campo de Vercel; (2) `Set-Clipboard -Value ""` falla en esta versión de PowerShell: usar `Set-Clipboard -Value "vacio"` y borrar el historial (Windows+V); (3) `verifier:new` ahora podría pedir confirmación antes de `--force` (pendiente). Mejora derivada: `/api/health` ahora comprueba que `VERIFIER_PRIVATE_KEY` sea válida y corresponda al verifier del contrato (E2E 29/29).
+
+## Sin probar / riesgos (honesto)
+- Nada contra **Solana devnet** ni **Monad Testnet**; nada con **MetaMask/Phantom** reales. El formato `jsonParsed` real podría diferir de las fixtures → el verificador rechazaría pagos válidos; probar primero eso.
+- **Mint USDC devnet (corregido 2026-10-06):** la dirección que había puesto de memoria (`4zMMC9sr…ZKqt`) era **inventada en su final y no existe** en devnet (confirmado con `real:preflight`, con el RPC y con Solana Explorer). La correcta, copiada de la documentación de Circle por el usuario, es `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`; **falta confirmar con `npm run real:preflight`** que existe, es de SPL Token y tiene 6 decimales. Configurable con `NEXT_PUBLIC_SOLANA_USDC_MINT` / `SOLANA_USDC_MINT`.
+- El endpoint de confirmación es público: rate limit en memoria (no sirve con varias instancias, p. ej. serverless) y sin autenticación; cualquiera con una firma válida puede disparar el registro (idempotente). La identidad Solana del pagador no se liga al `buyer` EVM (D19).
+- **Despliegue (etapa 12) no hecho.** Antes de desplegar leer `DEPLOY.md` § 0: la clave del verifier NO debe ser la wallet personal owner/deployer (D21). Las `NEXT_PUBLIC_*` se fijan en build.
+- Hallazgo propio al probar `check:deploy`: la primera versión daba ✓ sin comparar el secreto cuando la variable no estaba definida (falso OK). Corregido: avisa y revisa además las variables `NEXT_PUBLIC_*`.
+- La UI de Monad Testnet mostrará "Monad (Monad Testnet)"; en anvil dice "(Foundry)".
+
+## Entorno (contenedores sin acceso a foundry.paradigm.xyz)
+`foundryup` y la descarga de solc suelen estar bloqueados. Workaround usado: `npm i -g @foundry-rs/forge @foundry-rs/anvil @foundry-rs/cast`, y un shim de `solc` (paquete npm `solc` 0.8.28, wasm) con la interfaz CLI de solc, pasado con `FOUNDRY_SOLC=<shim> FOUNDRY_OFFLINE=true`. Con acceso normal no hace falta nada de esto. Submódulos: `git submodule update --init --recursive`.
 
 ## Roto
 - Nada conocido.
-
-## Falta
-- UI de detalle de obligación y cuotas (etapa 5 → `NEXT_TASK.md`).
-- Crear obligación desde la UI con wallet EVM (etapa 6).
-- Pago manual por el vendedor desde la UI (etapa 7).
-- Todo Solana: pago USDC devnet + memo, verificador `/api/payments/confirm` (etapas 8–9).
-- Deploy de `web/` en Vercel (etapa 12).
-- Todavía no hay obligaciones creadas en Monad Testnet (no se sembró la demo para no crear datos con un comprador ficticio).
 
 ## Cómo ejecutar
 
@@ -56,20 +112,21 @@ Luego poner la dirección en `web/.env.local` (`NEXT_PUBLIC_CHAIN_ID=10143`, `NE
 
 ## Cómo probar
 - Contrato: `cd contracts && forge test -vv`.
-- Web: `cd web && npm run lint && npx tsc --noEmit && npm run build`.
-- Manual: con el flujo local, `http://localhost:3000` debe mostrar "Obligaciones registradas: 1".
+- Todo junto: `./scripts/run-local-e2e.sh` (ver arriba). Individual: `cd web && npm run lint && npx tsc --noEmit && npm run build`, `npm run test:create|test:solana|test:verify|test:onchain` (los que usan anvil necesitan `set -a; . ./.env.local; set +a`).
+- Manual: con el flujo local, `http://localhost:3000` debe mostrar "Obligaciones registradas: 1" y `/obligations/1` 10 cuotas PENDING de 1.000 USDC.
 - Si cambiás el contrato: `./scripts/export-abi.sh` para regenerar `web/src/lib/abi.ts`.
 
 ## Direcciones desplegadas
 | Red | InstallmentRegistry | verifier | fecha |
 |---|---|---|---|
-| Monad Testnet (10143) | [`0xF7a6e0f226ecDc708Af88679F2A9a557E918C321`](https://testnet.monadexplorer.com/address/0xF7a6e0f226ecDc708Af88679F2A9a557E918C321) | `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` (= owner/deployer) | 2026-10-03, tx [`0xc4db6db4…`](https://testnet.monadexplorer.com/tx/0xc4db6db49374aff5c5c6a92b24aac41043ed19d92f9776749f8534affb4f6efd) |
+| Monad Testnet (10143) — **ACTUAL (con cesión de pagarés)** | [`0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e`](https://testnet.monadexplorer.com/address/0x8d7c86cb74e596f86ff69fd12a40c26330a5bf8e) | `0xFb17de8652A857De135d14898712Fe45e4509156` (wallet dedicada, **rotada 2026-10-07**; la anterior `0x71fE6cD7c2aD770584fc7fCc763adF36e884cA70` quedó revocada); owner `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc` | 2026-10-07, desplegado desde `/admin/deploy` firmando con MetaMask; `real:preflight` ✓ |
+| Monad Testnet (10143) — OBSOLETO (sin cesión) | `0xF7a6e0f226ecDc708Af88679F2A9a557E918C321` | (verifier = owner, ahora superado) | 2026-10-03 (Devin); 0 obligaciones, no se usa más |
 
 ## Última tarea realizada
-Deploy de `InstallmentRegistry` en Monad Testnet y verificación de lectura desde la web. Antes: base del MVP (estructura, docs, contrato con tests, scripts, web).
+Etapa 10 (demo e2e local + guion + capturas) y batería completa de pruebas (etapa 11), con hallazgos corregidos (ver "Bugs reales"). Antes: etapas 5–9.
 
 ## Próxima tarea recomendada
-Página `/obligations/[id]` con la tabla de cuotas (etapa 5). Detalle en `NEXT_TASK.md`.
+Validar contra redes reales (Solana devnet + Monad Testnet + wallets reales) siguiendo `DEMO.md` § "Demo con redes reales". Detalle en `NEXT_TASK.md`.
 
 ## Credenciales
 - La clave del deployer/verifier (wallet MetaMask de Bernardo `0x316A886C4948Ba8Caf10bae25d37Febf42e525dc`, solo testnet) está guardada como secreto de Devin `MONAD_DEPLOYER_PRIVATE_KEY`. **Nunca** commitearla ni ponerla en variables `NEXT_PUBLIC_*`. En Claude Code / local, usarla desde una variable de entorno o `.env` (ignorado por git).
